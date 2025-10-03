@@ -1,14 +1,15 @@
 # QUY TRÌNH LÀM VIỆC DỰ ÁN (Project Workflow)
-# version: 1.1
-# last-updated: 2025-10-02
-# description: Bổ sung quy định về môi trường làm việc và công cụ (VSCode, Pylint, Copilot).
+# version: 1.2
+# last-updated: 2025-10-03
+# description: Bổ sung bước xóa nhánh sau khi hợp nhất (merge).
 
 ## 1. Triết lý Chung
 * **Nguồn sự thật duy nhất:** Nhánh `main` là nền tảng ổn định. Mọi thứ trên `main` phải luôn ở trạng thái chạy được.
 * **Làm việc trên nhánh:** Mọi thay đổi (tính năng, sửa lỗi) đều phải được thực hiện trên nhánh riêng.
-* **Hợp nhất qua Pull Request:** Mọi thay đổi chỉ được đưa vào `main` thông qua PR để đảm bảo có sự rà soát.
+* **Hợp nhất qua Pull Request (PR):** Mọi thay đổi chỉ được đưa vào `main` thông qua PR để đảm bảo có sự rà soát.
 * **AI là Cộng tác viên:** Gemini AI phải tuân thủ nghiêm ngặt toàn bộ quy trình này.
 
+---
 ## 2. Quy trình làm việc với Git
 
 ### 2.1. Đặt tên nhánh
@@ -21,14 +22,39 @@
 * Sử dụng **Conventional Commits** (`<type>(<scope>): <subject>`).
 * Ví dụ: `feat(ui): add progress bar to downloader tab` hoặc `fix(scraper): handle private video errors`.
 
+### 2.3. Quy trình Hợp nhất và Dọn dẹp
+Sau khi một nhánh `feature` hoặc `fix` đã được kiểm thử và sẵn sàng, quy trình hợp nhất vào `main` sẽ bao gồm các bước sau:
+1.  **Cập nhật `main`:**
+    ```bash
+    git checkout main
+    git pull origin main
+    ```
+2.  **Hợp nhất nhánh:**
+    ```bash
+    git merge <ten-nhanh-feature>
+    ```
+3.  **Đẩy `main` lên remote:**
+    ```bash
+    git push origin main
+    ```
+4.  **Dọn dẹp (Cleanup):**
+    ```bash
+    # Xóa nhánh ở máy cục bộ
+    git branch -d <ten-nhanh-feature>
+
+    # Xóa nhánh ở trên GitHub (tùy chọn nhưng được khuyến khích)
+    git push origin --delete <ten-nhanh-feature>
+    ```
+
+---
 ## 3. Quy trình Cộng tác với Gemini AI (BẮT BUỘC)
 
 ### 3.1. Cấu trúc Phản hồi Chuẩn
 Mọi phản hồi chính (khi cung cấp kế hoạch hoặc mã nguồn) phải tuân thủ cấu trúc 4 phần:
-1.  **Phần 1: Phân tích & Kế hoạch**
-2.  **Phần 2: Gói Cập Nhật Mục Tiêu (Mã nguồn)**
-3.  **Phần 3: Hướng dẫn Hành động & Lệnh Git**
-4.  **Phần 4: Kết quả Kỳ vọng & Cảnh báo**
+1.  **Phần 1:** Phân tích & Kế hoạch
+2.  **Phần 2:** Gói Cập Nhật Mục Tiêu (Mã nguồn)
+3.  **Phần 3:** Hướng dẫn Hành động & Lệnh Git
+4.  **Phần 4:** Kết quả Kỳ vọng & Cảnh báo
 
 ### 3.2. Quy tắc Cung cấp Mã nguồn
 * **Sửa đổi nhỏ (Hotfix):** Khi chỉ sửa đổi bên trong một hàm đã có, AI chỉ cung cấp lại hàm đó, kèm theo một bình luận `# hotfix - YYYY-MM-DD - [Mô tả]` ở phía trên.
