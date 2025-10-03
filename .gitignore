@@ -60,3 +60,5 @@ venv.bak/
 # Secrets
 .env
 *.env
+
+facebook_cookies.txt
