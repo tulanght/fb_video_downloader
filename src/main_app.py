@@ -8,6 +8,7 @@ import logging
 from src.ui.downloader_tab import DownloaderTab
 from src.core.ui_logger import CTkTextboxHandler
 
+APP_VERSION = "0.3.0" # Phiên bản khởi tạo
 class MainApp(customtkinter.CTk):
     def __init__(self):
         super().__init__()
