@@ -62,3 +62,4 @@ venv.bak/
 *.env
 
 facebook_cookies.txt
+facebook_cookies.json
