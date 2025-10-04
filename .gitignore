@@ -63,3 +63,9 @@ venv.bak/
 
 facebook_cookies.txt
 facebook_cookies.json
+
+# Bỏ qua thư mục chứa kết quả đã lưu
+output/
+
+# Bỏ qua thư mục chứa video tải về
+downloads/

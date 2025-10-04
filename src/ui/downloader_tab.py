@@ -1,37 +1,32 @@
 # file-path: src/ui/downloader_tab.py
-# version: 2.8
+# version: 3.0
 # last-updated: 2025-10-04
-# description: Thêm cột STT, nhãn tiến trình real-time và các cải tiến UX.
+# description: Sửa lỗi logic không tìm thấy video đã chọn và thêm debug log.
 
-import customtkinter
-import threading
-import tkinter.ttk as ttk
-import queue
-import json
+# (Các import không đổi, chỉ thêm downloader)
+import customtkinter, threading, tkinter.ttk as ttk, queue, json
 from tkinter import filedialog
 from datetime import datetime
 from tkcalendar import DateEntry
 from src.core.scraper import scrape_video_urls, get_video_details_yt_dlp, standardize_facebook_url
+from src.core.downloader import download_videos # <-- THÊM MỚI
+import logging # <-- THÊM DÒNG NÀY
 
 class DownloaderTab(customtkinter.CTkFrame):
     def __init__(self, master):
         super().__init__(master)
-        
-        self.scraped_links = []
-        self.video_details_list = []
-        self.url_queue = queue.Queue()
-        self.is_running_task = False
-
+        # (Phần khởi tạo biến và layout không đổi)
+        self.scraped_links = []; self.video_details_list = []; self.url_queue = queue.Queue(); self.is_running_task = False
         self.grid_columnconfigure(0, weight=1); self.grid_rowconfigure(2, weight=1)
 
-        # (Giao diện không thay đổi nhiều, chỉ thêm 1 frame cho progress)
-        self.options_frame = customtkinter.CTkFrame(self); self.options_frame.grid(row=0, column=0, padx=10, pady=(10,5), sticky="ew")
+        # --- Giao diện (thêm nút Tải và thanh tiến trình Tải) ---
+        self.options_frame = customtkinter.CTkFrame(self); self.options_frame.grid(row=0, column=0, padx=10, pady=(10,5), sticky="ew") #...
         self.options_frame.grid_columnconfigure(1, weight=1)
         customtkinter.CTkLabel(self.options_frame, text="URL Facebook Page:").grid(row=0, column=0, padx=10, pady=10)
         self.url_entry = customtkinter.CTkEntry(self.options_frame, placeholder_text="Dán link của tab Videos hoặc Reels..."); self.url_entry.grid(row=0, column=1, padx=10, pady=10, sticky="ew")
         self.scrape_button = customtkinter.CTkButton(self.options_frame, text="1. Lấy URL Online", command=self.start_scraping_thread); self.scrape_button.grid(row=0, column=2, padx=10, pady=10)
         
-        self.filter_frame = customtkinter.CTkFrame(self); self.filter_frame.grid(row=1, column=0, padx=10, pady=5, sticky="ew")
+        self.filter_frame = customtkinter.CTkFrame(self); self.filter_frame.grid(row=1, column=0, padx=10, pady=5, sticky="ew") #...
         self.filter_frame.grid_columnconfigure(8, weight=1)
         customtkinter.CTkLabel(self.filter_frame, text="Lọc:").grid(row=0, column=0, padx=(10,0), pady=10)
         self.start_date_entry = DateEntry(self.filter_frame, date_pattern='y-mm-dd', width=12); self.start_date_entry.grid(row=0, column=1, padx=5, pady=10)
@@ -43,16 +38,29 @@ class DownloaderTab(customtkinter.CTkFrame):
         self.save_button = customtkinter.CTkButton(self.filter_frame, text="Lưu Phiên", width=100, command=self.save_session_to_json, state="disabled"); self.save_button.grid(row=0, column=7, padx=5, pady=10)
         self.status_label = customtkinter.CTkLabel(self.filter_frame, text="Sẵn sàng.", text_color="gray"); self.status_label.grid(row=0, column=8, padx=10, pady=10, sticky="w")
         
-        self.result_frame = customtkinter.CTkFrame(self); self.result_frame.grid(row=2, column=0, padx=10, pady=10, sticky="nsew")
+        self.result_frame = customtkinter.CTkFrame(self); self.result_frame.grid(row=2, column=0, padx=10, pady=10, sticky="nsew") #...
         self.result_frame.grid_columnconfigure(0, weight=1); self.result_frame.grid_rowconfigure(0, weight=1)
         self._create_treeview()
 
-        # Frame mới cho tiến trình real-time
-        self.progress_frame = customtkinter.CTkFrame(self, fg_color="transparent")
+        self.progress_frame = customtkinter.CTkFrame(self, fg_color="transparent") #...
         self.progress_frame.grid(row=3, column=0, padx=10, pady=(0,5), sticky="ew")
         self.progress_frame.grid_columnconfigure(0, weight=1)
-        self.realtime_status_label = customtkinter.CTkLabel(self.progress_frame, text="", text_color="gray")
-        self.realtime_status_label.grid(row=0, column=0, sticky="e") # Căn lề phải
+        self.realtime_status_label = customtkinter.CTkLabel(self.progress_frame, text="", text_color="gray"); self.realtime_status_label.grid(row=0, column=0, sticky="e")
+
+        # --- KHUNG TẢI XUỐNG MỚI ---
+        self.download_frame = customtkinter.CTkFrame(self)
+        self.download_frame.grid(row=4, column=0, padx=10, pady=10, sticky="ew")
+        self.download_frame.grid_columnconfigure(1, weight=1)
+
+        self.download_button = customtkinter.CTkButton(self.download_frame, text="3. Tải Video Đã Chọn", command=self.start_download_thread)
+        self.download_button.grid(row=0, column=0, padx=10, pady=10)
+
+        self.download_progress_label = customtkinter.CTkLabel(self.download_frame, text="")
+        self.download_progress_label.grid(row=0, column=1, padx=10, pady=10, sticky="w")
+        
+        self.download_progressbar = customtkinter.CTkProgressBar(self.download_frame, orientation="horizontal")
+        self.download_progressbar.grid(row=0, column=2, padx=10, pady=10, sticky="ew")
+        self.download_progressbar.set(0)
 
     def _create_treeview(self):
         self.tree = ttk.Treeview(self.result_frame, columns=('#', 'title', 'date', 'url'), show='headings')
@@ -204,3 +212,60 @@ class DownloaderTab(customtkinter.CTkFrame):
     def update_status(self, message):
         # (Không đổi)
         self.status_label.configure(text=message)
+        
+    # hotfix - 2025-10-04 - Sửa lỗi index và thêm debug log cho chức năng tải video
+    def start_download_thread(self):
+        selected_items = self.tree.selection()
+        if not selected_items:
+            self.update_status("Lỗi: Vui lòng chọn ít nhất một video để tải.")
+            return
+
+        videos_to_download = []
+        for item_id in selected_items:
+            # Dữ liệu trên 1 dòng bao gồm: (STT, Tiêu đề, Ngày, URL)
+            item_data = self.tree.item(item_id)['values']
+            
+            # SỬA LỖI: URL nằm ở index 3, không phải 2
+            url_from_tree = item_data[3] 
+
+            for video in self.video_details_list:
+                if video['url'] == url_from_tree:
+                    videos_to_download.append(video)
+                    break
+        
+        if not videos_to_download:
+            # THÊM DEBUG LOG
+            self.update_status("Lỗi: Không tìm thấy dữ liệu chi tiết cho các video đã chọn.")
+            logging.warning("Không thể khớp video được chọn trong Treeview với danh sách video_details_list.")
+            return
+
+        self._update_button_states(is_busy=True)
+        page_url = self.url_entry.get()
+        thread = threading.Thread(target=self.download_worker, args=(videos_to_download, page_url))
+        thread.start()
+
+    def download_worker(self, videos_to_download, page_url):
+        def status_callback(message):
+            self.after(0, self.update_status, message)
+        
+        def progress_callback(progress_str):
+            try:
+                # Chuyển đổi chuỗi % (ví dụ ' 25.4%') thành số float (0.254)
+                progress_float = float(progress_str.replace('%','').strip()) / 100
+                self.after(0, self.update_download_progress, progress_float)
+            except (ValueError, TypeError):
+                pass
+
+        download_videos(videos_to_download, page_url, status_callback, progress_callback)
+        
+        # Báo hiệu hoàn tất
+        self.after(0, self.finalize_download)
+
+    def update_download_progress(self, value):
+        self.download_progressbar.set(value)
+        self.download_progress_label.configure(text=f"{value*100:.1f}%")
+
+    def finalize_download(self):
+        # (Cập nhật để dùng hàm quản lý trạng thái chung)
+        self.update_status("Hoàn tất tất cả các lượt tải!")
+        self._update_button_states(is_busy=False)
