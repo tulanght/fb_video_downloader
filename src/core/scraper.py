@@ -1,7 +1,7 @@
 # file-path: src/core/scraper.py
-# version: 6.0 (Stable)
-# last-updated: 2025-10-05
-# description: Phiên bản ổn định, trả về danh sách trực tiếp, không dùng queue.
+# version: 6.1 (Stable & Ordered)
+# last-updated: 2025-10-06
+# description: Sửa lỗi dùng set làm mất thứ tự, đảm bảo list URL trả về luôn được sắp xếp.
 
 import logging
 import re
@@ -36,14 +36,16 @@ def get_video_details_yt_dlp(video_url: str) -> dict:
         return {'title': 'Lỗi', 'upload_date': None, 'description': None, 'id': None, 'thumbnail': None, 'uploader': None}
 
 def scrape_video_urls(page_url: str, scroll_count: int, status_callback):
-    """Sử dụng Selenium để cuộn trang và trả về một danh sách các URL video thô."""
+    """Sử dụng Selenium để cuộn trang và trả về một danh sách URL đã giữ nguyên thứ tự."""
     status_callback("Khởi tạo trình duyệt...")
     chrome_options = Options()
     chrome_options.add_argument("--disable-notifications")
     service = Service(executable_path='chromedriver.exe')
     driver = webdriver.Chrome(service=service, options=chrome_options)
     
-    video_links = set()
+    ordered_video_links = []
+    seen_urls = set()
+
     try:
         driver.get("https://www.facebook.com")
         status_callback("Đang tải cookie (JSON)...")
@@ -67,14 +69,17 @@ def scrape_video_urls(page_url: str, scroll_count: int, status_callback):
             href = tag.get_attribute('href')
             if href and re.search(r"/(?:videos|reel)/\d+", href):
                 clean_href = href.split('?')[0]
-                video_links.add(clean_href)
+                if clean_href not in seen_urls:
+                    seen_urls.add(clean_href)
+                    ordered_video_links.append(clean_href)
+
     except Exception:
         logging.error(traceback.format_exc())
     finally:
         status_callback("Đóng trình duyệt...")
         driver.quit()
 
-    if not video_links:
+    if not ordered_video_links:
         return []
     
-    return [{'url': standardize_facebook_url(link)} for link in video_links]
+    return [{'url': standardize_facebook_url(link)} for link in ordered_video_links]

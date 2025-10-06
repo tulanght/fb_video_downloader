@@ -3,10 +3,14 @@
 # last-updated: 2025-10-05
 # description: Cải tiến logic để nối các mảnh phụ đề thành câu hoàn chỉnh.
 
-import re, os
+import re
+import os
 import logging
 
 def convert_srt_to_clean_txt(srt_path: str):
+    """
+    Đọc một file .srt, loại bỏ timestamp và số thứ tự, sau đó lưu thành file .txt.
+    """
     if not srt_path or not os.path.exists(srt_path):
         return None
 
@@ -17,7 +21,7 @@ def convert_srt_to_clean_txt(srt_path: str):
             content = f.read()
 
         # Loại bỏ dòng số và dòng timestamp
-        content = re.sub(r'\d+\n\d{2}:\d{2}:\d{2},\d{3} --> \d{2}:\d{2}:\d{2},\d{3}\n', '', content)
+        content = re.sub(r'\d+\n\d{2}:\d{2}:\d{2},\d{3} --> \d{2}:\d{2}:\d{2},\d{3}\n', '', content, flags=re.MULTILINE)
         # Nối các dòng văn bản lại với nhau, thay thế xuống dòng bằng dấu cách
         content = re.sub(r'\n(?![\n])', ' ', content)
         # Loại bỏ các dòng trống thừa

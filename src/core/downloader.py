@@ -12,19 +12,37 @@ from src.core.app_path import get_app_base_path
 from src.core.subtitle_converter import convert_srt_to_clean_txt
 from src.core.scraper import get_video_details_yt_dlp
 
-def download_video_session(video_list: list, status_callback, progress_callback):
+def _get_page_name_from_list(video_list: list) -> str:
+    """Lấy tên page một cách thông minh từ video đầu tiên trong danh sách."""
+    if not video_list:
+        return None
+        
+    first_video_url = video_list[0].get('url')
+    if not first_video_url:
+        return None
+
+    logging.info(f"Đang xác định tên Page từ URL: {first_video_url}")
+    details = get_video_details_yt_dlp(first_video_url)
+    return details.get('uploader')
+
+def download_video_session(video_list: list, identifier: str, status_callback, progress_callback):
     if not video_list:
         status_callback("Lỗi: Không có video nào trong danh sách để tải.")
         return
 
-    # --- Lấy Tên Page một cách thông minh ---
-    status_callback("Đang xác định tên Page...")
-    first_video_details = get_video_details_yt_dlp(video_list[0]['url'])
-    page_name = first_video_details.get('uploader')
+    page_name = _get_page_name_from_list(video_list)
     if not page_name:
-        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-        page_name = f"unknown_page_{timestamp}"
-        logging.warning(f"Không xác định được tên page, sử dụng tên fallback: {page_name}")
+        # Fallback: trích xuất từ URL page hoặc tên file
+        match = re.search(r"facebook\.com/([^/]+)", identifier)
+        if match:
+            page_name = match.group(1)
+        else:
+            try:
+                base_name = os.path.basename(identifier)
+                page_name, _ = os.path.splitext(base_name)
+            except:
+                timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+                page_name = f"unknown_page_{timestamp}"
     
     base_path = get_app_base_path()
     download_dir = os.path.join(base_path, 'downloads', page_name)
@@ -33,9 +51,9 @@ def download_video_session(video_list: list, status_callback, progress_callback)
 
     total_videos = len(video_list)
     for i, video in enumerate(video_list):
-        current_video_title = video.get('title', video.get('id', 'video_khong_tieu_de'))
+        current_video_title = video.get('title', 'video_khong_tieu_de')
         status_callback(f"Bắt đầu tải video {i+1}/{total_videos}: {current_video_title[:40]}...")
-        progress_callback("0.0%") # Reset progress bar
+        progress_callback("0.0%")
 
         def progress_hook(d):
             if d['status'] == 'downloading':
@@ -61,13 +79,11 @@ def download_video_session(video_list: list, status_callback, progress_callback)
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 info = ydl.extract_info(video['url'], download=True)
                 if info is None: raise Exception("Không thể lấy thông tin video.")
-
                 filename = ydl.prepare_filename(info)
                 base_filename, _ = os.path.splitext(filename)
                 
-                # Tìm file srt với các hậu tố ngôn ngữ có thể có
                 subtitle_path = None
-                for lang_code in ['en', 'vi', '']: # Thêm các mã ngôn ngữ khác nếu cần
+                for lang_code in ['vi', 'en', '']:
                     potential_srt_path = f"{base_filename}.{lang_code}.srt" if lang_code else f"{base_filename}.srt"
                     if os.path.exists(potential_srt_path):
                         subtitle_path = convert_srt_to_clean_txt(potential_srt_path)
