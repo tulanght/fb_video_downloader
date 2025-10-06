@@ -138,13 +138,20 @@ class DownloaderTab(customtkinter.CTkFrame):
             self.update_status("Không tìm thấy link nào.")
         self._update_button_states(is_busy=False)
 
+    # --- LUỒNG 2: LỌC & LẤY CHI TIẾT (TỐI ƯU HIỆU NĂNG) ---
     def start_filtering_thread(self, source_links=None):
         self._update_button_states(is_busy=True)
         self.tree.delete(*self.tree.get_children())
         self.video_details_list = []
-        self.stop_requested.clear(); self.is_running_task = True
+        self.stop_requested.clear()
+        self.is_running_task = True
+
         links_to_process = source_links if source_links is not None else self.scraped_links
-        start_date = self.start_date_entry.get_date(); end_date = self.end_date_entry.get_date()
+        # KHÔNG ĐẢO NGƯỢC DANH SÁCH (quan trọng)
+        
+        start_date = self.start_date_entry.get_date()
+        end_date = self.end_date_entry.get_date()
+        
         thread = threading.Thread(target=self.filter_and_fetch_worker, args=(links_to_process, start_date, end_date))
         self.app.worker_threads = [thread]
         thread.start()
@@ -156,8 +163,7 @@ class DownloaderTab(customtkinter.CTkFrame):
             for i, link_info in enumerate(links_to_process):
                 if self.stop_requested.is_set(): break
                 
-                # GIẢM TẢI: Chỉ cập nhật status sau mỗi 5 links
-                if i % 5 == 0:
+                if i % 5 == 0: # Giảm tải
                     status_msg = f"Đang kiểm tra {i+1}/{total_links}... (Tìm thấy: {found_count})"
                     self.after(0, self.update_status, status_msg)
                 
@@ -173,6 +179,7 @@ class DownloaderTab(customtkinter.CTkFrame):
                     details['url'] = link_info['url']
                     details['upload_date_str'] = video_date.strftime("%Y-%m-%d")
                     details['status'] = 'pending'
+                    
                     self.video_details_list.append(details)
                     self.after(0, self.add_item_to_tree, details)
                 except (ValueError, TypeError): continue
@@ -181,12 +188,14 @@ class DownloaderTab(customtkinter.CTkFrame):
             self.after(0, self.finalize_filtering)
     
     def add_item_to_tree(self, item):
+        """Chèn một video mới vào CUỐI của Treeview. Nhanh và hiệu quả."""
         subtitle_check = "✓" if item.get('subtitle_path') else ""
         self.tree.insert('', 'end', values=(item['stt'], item['title'], item['upload_date_str'], subtitle_check, item['url']), iid=item['url'])
         self.realtime_status_label.configure(text=f"Đã lọc được {item['stt']} video")
     
     def finalize_filtering(self):
-        # Sắp xếp lại danh sách DỮ LIỆU một lần cuối để đảm bảo
+        """Chỉ cập nhật trạng thái và nút bấm, không sắp xếp hay vẽ lại."""
+        # Sắp xếp lại danh sách DỮ LIỆU một lần cuối để đảm bảo thứ tự cho việc lưu file
         self.video_details_list.sort(key=lambda x: x.get('upload_date_str', '0'), reverse=True)
         self.update_status(f"Hoàn tất! Tìm thấy {len(self.video_details_list)} video phù hợp.")
         self._update_button_states(is_busy=False)
