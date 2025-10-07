@@ -1,5 +1,21 @@
 # Lịch sử thay đổi (Changelog)
 
+## [0.4.0] - 2025-10-07
+### ✨ Tính năng mới (Features)
+- **Tích hợp Luồng Tải Video:** Triển khai chức năng tải video, thumbnail từ `yt-dlp`.
+- **Tổ chức File Tải về:** Tự động tạo thư mục con theo Tên Page và đánh số thứ tự cho file video, thumbnail.
+- **Xem Caption:** Cho phép xem đầy đủ caption của video bằng cách nhấp đúp chuột vào một dòng trong bảng kết quả.
+- **Xử lý Tên Page Thông minh:** Tự động tìm tên Page chính xác khi tải từ file JSON/TXT để tạo thư mục, với cơ chế fallback an toàn.
+- **Hỗ trợ Phụ đề (Nền tảng):** Xây dựng module `subtitle_converter.py` với logic làm sạch và chuyển đổi phụ đề từ `.srt` sang `.txt`.
+
+### ♻️ Thay đổi & Tối ưu hóa (Changed & Optimized)
+- **Tối ưu Hiệu năng Lọc:** Thay thế thuật toán sắp xếp real-time `O(N^2)` bằng thuật toán "Logic Vàng" `O(N)`, giúp quá trình lọc và hiển thị nhanh và mượt mà hơn đáng kể.
+- **Kiến trúc Xử lý Luồng:** Tái cấu trúc và ổn định hóa hoàn toàn kiến trúc đa luồng, loại bỏ các lỗi "đứng im", "ảo giác" và `RuntimeError` khi đóng ứng dụng.
+- **Nâng cấp Script Phát hành:** Cải tiến `release.py` để tương thích với cấu trúc dự án mới và hoạt động ổn định hơn.
+
+### 🐛 Sửa lỗi (Fixed)
+- Sửa lỗi nghiêm trọng khiến danh sách URL từ Selenium bị mất thứ tự sắp xếp ban đầu.
+
 ## [0.3.0] - 2025-10-04
 
 ### ✨ Tính năng mới (Features)
