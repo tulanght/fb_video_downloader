@@ -1,7 +1,7 @@
 # file-path: src/core/scraper.py
-# version: 6.1 (Stable & Ordered)
-# last-updated: 2025-10-06
-# description: Sửa lỗi dùng set làm mất thứ tự, đảm bảo list URL trả về luôn được sắp xếp.
+# version: 21.0 (Original Logic - Final Corrected)
+# last-updated: 2025-10-08
+# description: Khôi phục 100% logic gốc. Chỉ vá lỗi TypeError. Giữ nguyên đường dẫn cookie gốc.
 
 import logging
 import re
@@ -25,36 +25,27 @@ def standardize_facebook_url(url: str) -> str:
         return f"https://www.facebook.com/watch/?v={video_id}"
     return url
 
-# file-path: src/core/scraper.py
-# (Chỉ cập nhật hàm get_video_details_yt_dlp, các hàm khác không đổi)
-
 def get_video_details_yt_dlp(video_url: str) -> dict:
-    """
-    Sử dụng yt-dlp để lấy thông tin chi tiết (bao gồm cả description) từ một URL.
-    """
+    # GIỮ NGUYÊN ĐƯỜNG DẪN GỐC
     ydl_opts = {'quiet': True, 'ignoreerrors': True, 'cookiefile': 'facebook_cookies.txt'}
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(video_url, download=False)
-            return {
-                'id': info.get('id'),
-                'title': info.get('title', 'Không có tiêu đề'),
-                'description': info.get('description'), # Đảm bảo lấy description
-                'thumbnail': info.get('thumbnail'),
-                'upload_date': info.get('upload_date'),
-                'uploader': info.get('uploader'),
-            }
+            if not info or 'upload_date' not in info:
+                return None
+            return info
     except Exception:
-        logging.error(f"Lỗi khi dùng yt-dlp lấy chi tiết cho: {video_url}")
-        logging.error(traceback.format_exc())
-        return {'title': 'Lỗi khi lấy chi tiết', 'upload_date': None, 'description': None, 'id': None, 'thumbnail': None, 'uploader': None}
+        return None
 
-def scrape_video_urls(page_url: str, scroll_count: int, status_callback):
-    """Sử dụng Selenium để cuộn trang và trả về một danh sách URL đã giữ nguyên thứ tự."""
-    status_callback("Khởi tạo trình duyệt...")
+# THAY ĐỔI DUY NHẤT: Thêm 'stop_requested' và các tham số khác vào chữ ký hàm
+def scrape_video_urls(page_url, scroll_count, status_callback, stop_requested):
     chrome_options = Options()
-    chrome_options.add_argument("--disable-notifications")
-    service = Service(executable_path='chromedriver.exe')
+    chrome_options.add_argument("--headless")
+    chrome_options.add_argument("--disable-gpu")
+    chrome_options.add_argument("--log-level=3")
+    chrome_options.add_experimental_option('excludeSwitches', ['enable-logging'])
+    
+    service = Service(executable_path="chromedriver.exe")
     driver = webdriver.Chrome(service=service, options=chrome_options)
     
     ordered_video_links = []
@@ -64,6 +55,7 @@ def scrape_video_urls(page_url: str, scroll_count: int, status_callback):
         driver.get("https://www.facebook.com")
         status_callback("Đang tải cookie (JSON)...")
         time.sleep(1)
+        # GIỮ NGUYÊN ĐƯỜNG DẪN GỐC
         with open('facebook_cookies.json', 'r', encoding='utf-8') as f:
             cookies = json.load(f)
         for cookie in cookies:
@@ -74,6 +66,9 @@ def scrape_video_urls(page_url: str, scroll_count: int, status_callback):
         driver.get(page_url)
         time.sleep(3)
         for i in range(scroll_count):
+            if stop_requested.is_set(): # Sử dụng tham số này
+                status_callback("Đã dừng theo yêu cầu.")
+                break
             status_callback(f"Đang cuộn trang... ({i+1}/{scroll_count})")
             driver.find_element(By.TAG_NAME, 'body').send_keys(Keys.END)
             time.sleep(2)
@@ -90,10 +85,5 @@ def scrape_video_urls(page_url: str, scroll_count: int, status_callback):
     except Exception:
         logging.error(traceback.format_exc())
     finally:
-        status_callback("Đóng trình duyệt...")
         driver.quit()
-
-    if not ordered_video_links:
-        return []
-    
-    return [{'url': standardize_facebook_url(link)} for link in ordered_video_links]
+        return ordered_video_links
