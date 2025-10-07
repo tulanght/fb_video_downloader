@@ -25,15 +25,29 @@ def standardize_facebook_url(url: str) -> str:
         return f"https://www.facebook.com/watch/?v={video_id}"
     return url
 
+# file-path: src/core/scraper.py
+# (Chỉ cập nhật hàm get_video_details_yt_dlp, các hàm khác không đổi)
+
 def get_video_details_yt_dlp(video_url: str) -> dict:
+    """
+    Sử dụng yt-dlp để lấy thông tin chi tiết (bao gồm cả description) từ một URL.
+    """
     ydl_opts = {'quiet': True, 'ignoreerrors': True, 'cookiefile': 'facebook_cookies.txt'}
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(video_url, download=False)
-            return {'id': info.get('id'), 'title': info.get('title', 'N/A'), 'description': info.get('description'),
-                    'thumbnail': info.get('thumbnail'), 'upload_date': info.get('upload_date'), 'uploader': info.get('uploader')}
+            return {
+                'id': info.get('id'),
+                'title': info.get('title', 'Không có tiêu đề'),
+                'description': info.get('description'), # Đảm bảo lấy description
+                'thumbnail': info.get('thumbnail'),
+                'upload_date': info.get('upload_date'),
+                'uploader': info.get('uploader'),
+            }
     except Exception:
-        return {'title': 'Lỗi', 'upload_date': None, 'description': None, 'id': None, 'thumbnail': None, 'uploader': None}
+        logging.error(f"Lỗi khi dùng yt-dlp lấy chi tiết cho: {video_url}")
+        logging.error(traceback.format_exc())
+        return {'title': 'Lỗi khi lấy chi tiết', 'upload_date': None, 'description': None, 'id': None, 'thumbnail': None, 'uploader': None}
 
 def scrape_video_urls(page_url: str, scroll_count: int, status_callback):
     """Sử dụng Selenium để cuộn trang và trả về một danh sách URL đã giữ nguyên thứ tự."""

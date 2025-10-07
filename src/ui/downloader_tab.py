@@ -15,7 +15,27 @@ from datetime import datetime
 from tkcalendar import DateEntry
 from src.core.scraper import scrape_video_urls, get_video_details_yt_dlp
 from src.core.downloader import download_video_session
+# Thêm CTkToplevel vào import
+import customtkinter
+from customtkinter import CTkToplevel 
 
+
+# --- THÊM LỚP CỬA SỔ XEM CAPTION MỚI ---
+class CaptionViewerWindow(CTkToplevel):
+    def __init__(self, title, caption):
+        super().__init__()
+        self.title("Nội dung Caption")
+        self.geometry("600x400")
+        self.grid_columnconfigure(0, weight=1)
+        self.grid_rowconfigure(1, weight=1)
+
+        title_label = customtkinter.CTkLabel(self, text=title, font=customtkinter.CTkFont(size=14, weight="bold"))
+        title_label.grid(row=0, column=0, padx=10, pady=10, sticky="w")
+
+        caption_textbox = customtkinter.CTkTextbox(self, wrap="word")
+        caption_textbox.grid(row=1, column=0, padx=10, pady=(0, 10), sticky="nsew")
+        caption_textbox.insert("1.0", caption or "Không có nội dung caption.")
+        caption_textbox.configure(state="disabled") # Chỉ cho xem, không cho sửa
 class DownloaderTab(customtkinter.CTkFrame):
     def __init__(self, master, app_ref):
         super().__init__(master)
@@ -85,6 +105,7 @@ class DownloaderTab(customtkinter.CTkFrame):
         self.download_progressbar = customtkinter.CTkProgressBar(self.download_frame, orientation="horizontal")
         self.download_progressbar.grid(row=0, column=2, padx=10, pady=10, sticky="ew")
         self.download_progressbar.set(0)
+        self.caption_window = None # Thêm biến để quản lý cửa sổ caption
 
     def _create_treeview(self):
         self.tree = ttk.Treeview(self.result_frame, columns=('#', 'title', 'date', 'subtitle', 'url'), show='headings')
@@ -95,6 +116,8 @@ class DownloaderTab(customtkinter.CTkFrame):
         v_scrollbar = customtkinter.CTkScrollbar(self.result_frame, command=self.tree.yview); v_scrollbar.grid(row=0, column=1, sticky="ns")
         h_scrollbar = customtkinter.CTkScrollbar(self.result_frame, command=self.tree.xview, orientation="horizontal"); h_scrollbar.grid(row=1, column=0, sticky="ew")
         self.tree.configure(yscrollcommand=v_scrollbar.set, xscrollcommand=h_scrollbar.set)
+        # --- THÊM SỰ KIỆN NHẤP ĐÚP ---
+        self.tree.bind("<Double-1>", self.show_caption_for_selected_item)
 
     def _update_button_states(self, is_busy=False):
         state = "disabled" if is_busy else "normal"
@@ -240,14 +263,23 @@ class DownloaderTab(customtkinter.CTkFrame):
             self.download_progress_label.configure(text=f"{progress_float*100:.1f}%")
         except (ValueError, TypeError): pass
 
+    # --- CẬP NHẬT CÁC HÀM XỬ LÝ KẾT QUẢ ---
     def update_row_status(self, result: dict):
         url = result.get('url'); status = result.get('status')
         if not url or not status or not self.tree.exists(url): return
+
+        # Cập nhật màu sắc
         self.tree.item(url, tags=(status,))
-        if result.get('subtitle_path'): self.tree.set(url, 'subtitle', '✓')
+        
+        # Cập nhật dấu tick phụ đề
+        if result.get('subtitle_path'):
+            self.tree.set(url, 'subtitle', '✓')
+
+        # Cập nhật trạng thái trong danh sách dữ liệu gốc
         for video in self.video_details_list:
             if video['url'] == url:
-                video['status'] = status; video['subtitle_path'] = result.get('subtitle_path')
+                video['status'] = status
+                video['subtitle_path'] = result.get('subtitle_path')
                 break
 
     def finalize_download(self, summary_message: str):
@@ -297,3 +329,31 @@ class DownloaderTab(customtkinter.CTkFrame):
                 links_from_file = [{'url': line.strip()} for line in f if line.strip().startswith("http")]
             self.start_filtering_thread(source_links=links_from_file)
         except Exception as e: self.update_status(f"Lỗi: {e}")
+    
+    # --- HÀM MỚI ĐỂ HIỂN THỊ CAPTION ---
+    def show_caption_for_selected_item(self, event):
+        selected_items = self.tree.selection()
+        if not selected_items:
+            return
+        
+        item_id = selected_items[0] # Chỉ lấy item đầu tiên được chọn
+        url_from_tree = self.tree.item(item_id)['values'][4]
+
+        # Tìm video trong danh sách dữ liệu để lấy caption
+        found_video = None
+        for video in self.video_details_list:
+            if video['url'] == url_from_tree:
+                found_video = video
+                break
+        
+        if found_video:
+            if self.caption_window is None or not self.caption_window.winfo_exists():
+                self.caption_window = CaptionViewerWindow(
+                    title=found_video.get('title', 'N/A'),
+                    caption=found_video.get('description', 'Không có caption.')
+                )
+                self.caption_window.after(100, self.caption_window.lift) # Đưa cửa sổ lên trên
+            else:
+                self.caption_window.focus()
+                
+    

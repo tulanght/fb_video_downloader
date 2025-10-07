@@ -63,13 +63,14 @@ def download_video_session(video_list: list, identifier: str, status_callback, p
                 progress_callback("100.0%")
 
         stt = video.get('stt', i + 1)
+        # --- CẬP NHẬT CẤU HÌNH YT-DLP ---
         ydl_opts = {
             'cookiefile': 'facebook_cookies.txt',
             'outtmpl': os.path.join(download_dir, f'{stt:03d} - %(title)s [%(id)s].%(ext)s'),
             'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
             'writethumbnail': True,
-            'writeautomaticsub': True,
-            'subformat': 'srt',
+            'writeautomaticsub': True,  # Bật tính năng tải phụ đề tự động
+            'subformat': 'srt',         # Yêu cầu định dạng .srt
             'progress_hooks': [progress_hook],
             'quiet': True,
             'ignoreerrors': True,
@@ -79,17 +80,22 @@ def download_video_session(video_list: list, identifier: str, status_callback, p
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 info = ydl.extract_info(video['url'], download=True)
                 if info is None: raise Exception("Không thể lấy thông tin video.")
+                
                 filename = ydl.prepare_filename(info)
                 base_filename, _ = os.path.splitext(filename)
                 
+                # --- LOGIC TÌM VÀ CHUYỂN ĐỔI PHỤ ĐỀ ---
                 subtitle_path = None
-                for lang_code in ['vi', 'en', '']:
+                # yt-dlp có thể lưu file phụ đề với nhiều mã ngôn ngữ khác nhau
+                for lang_code in ['vi', 'en', '']: # Thêm các mã khác nếu cần
                     potential_srt_path = f"{base_filename}.{lang_code}.srt" if lang_code else f"{base_filename}.srt"
                     if os.path.exists(potential_srt_path):
+                        logging.info(f"Đã tìm thấy file phụ đề: {potential_srt_path}")
                         subtitle_path = convert_srt_to_clean_txt(potential_srt_path)
-                        break
+                        break # Dừng lại khi đã tìm thấy và chuyển đổi thành công
                 
                 yield {'url': video['url'], 'status': 'success', 'subtitle_path': subtitle_path}
+
         except Exception as e:
             logging.error(f"Lỗi khi tải video {video['url']}: {e}")
             yield {'url': video['url'], 'status': 'fail'}
