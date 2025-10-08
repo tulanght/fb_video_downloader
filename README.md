@@ -1,4 +1,4 @@
-# FB Page Video Downloader v0.4.0
+# FB Page Video Downloader v0.5.4
 
 Một công cụ desktop mạnh mẽ được xây dựng bằng Python, giúp tự động hóa việc tải toàn bộ video từ một trang Facebook (Facebook Page) một cách hiệu quả và có tổ chức.
 

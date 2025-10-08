@@ -1,5 +1,27 @@
 # Lịch sử thay đổi (Changelog)
 
+## [0.5.4] - 2025-10-09
+## [0.5.0] - 2025-10-08
+### ✨ Tính năng mới (Features)
+- **Thiết kế lại Giao diện:** "Đại tu" toàn bộ giao diện người dùng với theme tối hiện đại, màu sắc có độ tương phản cao và bố cục được sắp xếp lại một cách khoa học, chuyên nghiệp.
+- **Tăng tốc Lọc Video (Đa luồng):** Tích hợp kiến trúc đa luồng cho "Bước 2: Lọc", cho phép xử lý nhiều video cùng lúc, giảm đáng kể thời gian chờ đợi.
+- **Tùy chọn Đơn luồng:** Thêm một switch trên giao diện để người dùng có máy cấu hình yếu có thể chuyển về chế độ lọc đơn luồng (tuần tự) để đảm bảo tính ổn định.
+- **Tự động Quản lý `chromedriver`:** Tích hợp thư viện `webdriver-manager` để tự động tải và cập nhật `chromedriver.exe` tương thích với phiên bản Chrome của người dùng, loại bỏ hoàn toàn việc phải cập nhật thủ công.
+- **Hướng dẫn Người dùng Mới:** Xây dựng hệ thống popup thông minh, có thể di chuyển được:
+    - Tự động phát hiện và hướng dẫn cài đặt cookie chi tiết cho lần chạy đầu tiên.
+    - Hiển thị hướng dẫn sử dụng nhanh với tùy chọn "Không hiển thị lại".
+- **Tùy chỉnh Trải nghiệm:** Bổ sung các tùy chọn mới trên giao diện như "Thời gian chờ cuộn" để đối phó với các điều kiện mạng chậm.
+
+### 🐛 Sửa lỗi (Bug Fixes)
+- **Sửa lỗi "0 Video":** Khắc phục triệt để lỗi logic cốt lõi khiến chương trình không lọc được video nào, đảm bảo `yt-dlp` hoạt động ổn định.
+- **Sửa lỗi Treo Giao diện:** Loại bỏ hoàn toàn hiện tượng giao diện bị "đơ", lag hoặc các nút bị vô hiệu hóa vĩnh viễn sau khi một tác vụ hoàn thành.
+- **Cải thiện Trải nghiệm (UX):** Khôi phục lại cơ chế hiển thị kết quả real-time trong quá trình lọc, giúp người dùng không phải nhìn vào một màn hình trống.
+- **Sửa lỗi Bố cục & Hiển thị:** Khắc phục hàng loạt lỗi về giao diện như widget bị che khuất, chữ khó đọc, popup bị lỗi vị trí và không thể thay đổi kích thước.
+
+### ♻️ Tái cấu trúc (Refactoring)
+- **Chuẩn hóa Đường dẫn:** Tái cấu trúc toàn bộ mã nguồn để sử dụng đường dẫn tuyệt đối, đảm bảo ứng dụng có thể chạy "di động" (portable) từ bất kỳ vị trí nào.
+- **Tối ưu hóa Code:** Dọn dẹp, tối ưu và thêm chú thích vào nhiều thành phần code sau quá trình debug kéo dài.
+
 ## [0.4.0] - 2025-10-07
 ### ✨ Tính năng mới (Features)
 - **Tích hợp Luồng Tải Video:** Triển khai chức năng tải video, thumbnail từ `yt-dlp`.

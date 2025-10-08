@@ -12,7 +12,7 @@ from src.ui.downloader_tab import DownloaderTab
 from src.core.ui_logger import CTkTextboxHandler
 from src.core.app_path import get_app_base_path
 
-APP_VERSION = "0.5.0"
+APP_VERSION = "0.5.4"
 
 customtkinter.set_appearance_mode("dark")
 customtkinter.set_default_color_theme("blue")

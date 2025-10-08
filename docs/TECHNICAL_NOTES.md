@@ -33,3 +33,16 @@ Tài liệu này ghi lại những quyết định kiến trúc quan trọng, c�
     * **Mất thứ tự Sắp xếp:** Việc sử dụng `set` để loại bỏ trùng lặp đã phá hỏng thứ tự sắp xếp tự nhiên của Selenium. Đã được khắc phục bằng cách dùng một `list` (để giữ thứ tự) và một `set` (chỉ để kiểm tra).
     * **Hiệu năng Real-time:** Thuật toán "chèn có sắp xếp" (`O(N^2)`) gây ra hiện tượng chậm và giật lag. Đã được khắc phục bằng cách quay về thuật toán "chèn vào cuối" (`O(N)`) dựa trên danh sách nguồn đã được sắp xếp sẵn.
     * **Lỗi Giao diện Bị treo ("Ảo giác"):** Nguyên nhân sâu xa là do luồng nền gửi quá nhiều yêu cầu cập nhật (`self.after`) trong một thời gian ngắn, làm "ngập lụt" và chặn vòng lặp sự kiện của giao diện. Đã được khắc phục bằng cách thêm cơ chế "giảm tải" (throttling), chỉ cập nhật trạng thái sau mỗi 5-10 items.
+
+    ---
+### **Quyết định Kiến trúc #3: Tự động hóa Quản lý Trình duyệt & Tối ưu Hiệu năng**
+
+* **Bối cảnh:** Quá trình chuẩn bị đóng gói đã bộc lộ hai điểm yếu lớn của kiến trúc ban đầu: sự phụ thuộc vào `chromedriver.exe` thủ công và hiệu năng chậm của quá trình lọc video.
+
+* **Quyết định:**
+    1.  **Tích hợp `webdriver-manager`:** Thay thế hoàn toàn cơ chế gọi `chromedriver.exe` tĩnh. Thư viện này sẽ tự động phát hiện phiên bản Chrome, tải về và cache trình điều khiển tương thích. Điều này giúp loại bỏ một bước cài đặt thủ công cho người dùng cuối và giải quyết vấn đề lỗi phiên bản trong tương lai.
+    2.  **Triển khai Đa luồng cho Tác vụ Lọc:** Tái cấu trúc lại luồng xử lý của "Bước 2". Thay vì gọi `yt-dlp` tuần tự cho mỗi URL, ứng dụng giờ đây sử dụng một `ThreadPoolExecutor` để tạo ra một nhóm các "worker" chạy song song. Mỗi worker sẽ xử lý một URL, giúp giảm đáng kể tổng thời gian chờ đợi của người dùng. Một tùy chọn đơn luồng vẫn được giữ lại để đảm bảo tính tương thích.
+
+* **Bài học Kinh nghiệm:**
+    * **Độ tin cậy của Đường dẫn:** Việc sử dụng đường dẫn tương đối (`'chromedriver.exe'`) đã được chứng minh là không đủ tin cậy cho một ứng dụng đóng gói. Việc chuyển sang kiến trúc đường dẫn tuyệt đối, được quản lý bởi `src/core/app_path.py`, là một bước đi cần thiết.
+    * **Cân bằng UX và Hiệu năng:** Giải pháp "Logic Vàng" (thu thập tất cả, hiển thị một lần) tuy tối ưu về mặt thuật toán nhưng lại tạo ra trải nghiệm người dùng tệ. Giải pháp cuối cùng kết hợp cả hai: hiển thị real-time (để người dùng có phản hồi) và chỉ sắp xếp lại một lần duy nhất ở cuối (để đảm bảo hiệu năng).
