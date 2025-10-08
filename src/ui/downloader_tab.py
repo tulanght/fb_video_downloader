@@ -1,7 +1,7 @@
 # file-path: src/ui/downloader_tab.py
-# version: 26.0 (Multi-threading Implementation)
+# version: 30.0 (Final UI Hotfix)
 # last-updated: 2025-10-08
-# description: Tích hợp kiến trúc đa luồng cho bước lọc để tăng tốc độ, kèm tùy chọn đơn luồng.
+# description: Sửa lỗi crash do tham số không hợp lệ và cải thiện độ tương phản cho các nút bị vô hiệu hóa.
 
 import customtkinter
 import threading
@@ -13,9 +13,8 @@ import os
 from tkinter import filedialog
 from datetime import datetime
 from tkcalendar import DateEntry
-# === THÊM IMPORT MỚI CHO ĐA LUỒNG ===
 from concurrent.futures import ThreadPoolExecutor, as_completed
-
+import yt_dlp
 from src.core.scraper import scrape_video_urls, get_video_details_yt_dlp, standardize_facebook_url
 from src.core.downloader import download_video_session
 from customtkinter import CTkToplevel
@@ -35,10 +34,12 @@ class CaptionViewerWindow(CTkToplevel):
         caption_textbox.insert("1.0", caption)
         caption_textbox.configure(state="disabled")
 
+
 class DownloaderTab(customtkinter.CTkFrame):
     def __init__(self, master, app_ref):
-        super().__init__(master)
+        super().__init__(master, fg_color="transparent")
         self.app = app_ref
+        # ... (Các thuộc tính khác)
         self.is_running_task = False
         self.stop_requested = threading.Event()
         self.is_scraping_done = False
@@ -47,76 +48,81 @@ class DownloaderTab(customtkinter.CTkFrame):
         self.caption_window = None
 
         self.grid_columnconfigure(0, weight=1)
-        self.grid_rowconfigure(3, weight=1)
+        self.grid_rowconfigure(2, weight=1)
 
-        # --- GIAO DIỆN ĐƯỢC BỐ CỤC LẠI ---
-        
-        # ** Khung 1: Input chính **
+        # === KHAI BÁO MÀU SẮC ĐỂ DỄ QUẢN LÝ ===
+        DISABLED_TEXT_COLOR = "#BFBFBF" # Một màu xám rất sáng, dễ đọc
+
+        # ** Khung 1: Input & Cấu hình cuộn trang **
         self.top_frame = customtkinter.CTkFrame(self)
         self.top_frame.grid(row=0, column=0, padx=10, pady=(10, 5), sticky="ew")
         self.top_frame.grid_columnconfigure(1, weight=1)
+
         customtkinter.CTkLabel(self.top_frame, text="URL Trang Facebook:").grid(row=0, column=0, padx=10, pady=10, sticky="w")
-        self.url_entry = customtkinter.CTkEntry(self.top_frame)
-        self.url_entry.grid(row=0, column=1, padx=10, pady=10, sticky="ew")
+        self.url_entry = customtkinter.CTkEntry(self.top_frame, placeholder_text="https://www.facebook.com/TenPage/reels/")
+        self.url_entry.grid(row=0, column=1, padx=(0,10), pady=10, sticky="ew")
 
-        # ** Khung 2: Tùy chọn và các nút hành động chính **
-        self.options_frame = customtkinter.CTkFrame(self)
-        self.options_frame.grid(row=1, column=0, padx=10, pady=5, sticky="ew")
-        self.options_frame.grid_columnconfigure(4, weight=1)
-
-        customtkinter.CTkLabel(self.options_frame, text="Số lần cuộn:").grid(row=0, column=0, padx=(10, 5), pady=10)
-        self.scroll_count_entry = customtkinter.CTkEntry(self.options_frame, width=60)
+        customtkinter.CTkLabel(self.top_frame, text="Số lần cuộn:").grid(row=0, column=2, padx=(10, 5), pady=10)
+        self.scroll_count_entry = customtkinter.CTkEntry(self.top_frame, width=60)
         self.scroll_count_entry.insert(0, "5")
-        self.scroll_count_entry.grid(row=0, column=1, padx=0, pady=10)
+        self.scroll_count_entry.grid(row=0, column=3, padx=0, pady=10)
         
-        customtkinter.CTkLabel(self.options_frame, text="Chờ (giây):").grid(row=0, column=2, padx=(15, 5), pady=10)
-        self.scroll_delay_entry = customtkinter.CTkEntry(self.options_frame, width=60)
+        customtkinter.CTkLabel(self.top_frame, text="Chờ (giây):").grid(row=0, column=4, padx=(10, 5), pady=10)
+        self.scroll_delay_entry = customtkinter.CTkEntry(self.top_frame, width=60)
         self.scroll_delay_entry.insert(0, "3")
-        self.scroll_delay_entry.grid(row=0, column=3, padx=0, pady=10)
+        self.scroll_delay_entry.grid(row=0, column=5, padx=0, pady=10)
 
-        self.scrape_button = customtkinter.CTkButton(self.options_frame, text="Bước 1: Lấy Link", command=self.start_scraping_thread)
-        self.scrape_button.grid(row=0, column=5, padx=10, pady=10)
-        self.stop_button = customtkinter.CTkButton(self.options_frame, text="Dừng", command=self.request_stop_task, fg_color="darkred")
-        self.stop_button.grid(row=0, column=6, padx=10, pady=10)
+        # === SỬA LỖI: Chỉ dùng text_color_disabled ===
+        self.scrape_button = customtkinter.CTkButton(self.top_frame, text="Bước 1: Lấy Link", command=self.start_scraping_thread, width=120, text_color_disabled=DISABLED_TEXT_COLOR)
+        self.scrape_button.grid(row=0, column=6, padx=(20, 10), pady=10)
+        self.stop_button = customtkinter.CTkButton(self.top_frame, text="Dừng", command=self.request_stop_task, fg_color="#D32F2F", hover_color="#B71C1C", width=60, text_color_disabled=DISABLED_TEXT_COLOR)
+        self.stop_button.grid(row=0, column=7, padx=(0, 10), pady=10)
 
-        # ** Khung 3: Lọc và các hành động phụ **
+        # ** Khung 2: Lọc và các hành động **
         self.action_frame = customtkinter.CTkFrame(self)
-        self.action_frame.grid(row=2, column=0, padx=10, pady=5, sticky="ew")
+        self.action_frame.grid(row=1, column=0, padx=10, pady=5, sticky="ew")
+        self.action_frame.grid_columnconfigure(5, weight=1)
         
-        self.filter_button = customtkinter.CTkButton(self.action_frame, text="Bước 2: Lọc", command=self.start_filtering_thread)
-        self.filter_button.pack(side="left", padx=(10,5), pady=10)
+        self.filter_button = customtkinter.CTkButton(self.action_frame, text="Bước 2: Lọc & Lấy Chi Tiết", command=self.start_filtering_thread, width=180, text_color_disabled=DISABLED_TEXT_COLOR)
+        self.filter_button.grid(row=0, column=0, padx=(10,5), pady=10)
         
-        customtkinter.CTkLabel(self.action_frame, text="Từ:").pack(side="left", padx=(10, 5), pady=10)
+        customtkinter.CTkLabel(self.action_frame, text="Từ:").grid(row=0, column=1, padx=(10, 5), pady=10)
         self.from_date_entry = DateEntry(self.action_frame, date_pattern='y-mm-dd', width=12)
-        self.from_date_entry.pack(side="left", padx=0, pady=10)
+        self.from_date_entry.grid(row=0, column=2, padx=0, pady=10)
         
-        customtkinter.CTkLabel(self.action_frame, text="Đến:").pack(side="left", padx=(10, 5), pady=10)
+        customtkinter.CTkLabel(self.action_frame, text="Đến:").grid(row=0, column=3, padx=(10, 5), pady=10)
         self.to_date_entry = DateEntry(self.action_frame, date_pattern='y-mm-dd', width=12)
-        self.to_date_entry.pack(side="left", padx=0, pady=10)
+        self.to_date_entry.grid(row=0, column=4, padx=0, pady=10)
 
-        # === GIAO DIỆN ĐA LUỒNG MỚI ===
-        self.threading_switch = customtkinter.CTkSwitch(self.action_frame, text="Đa luồng", onvalue=1, offvalue=0)
-        self.threading_switch.select() # Mặc định bật
-        self.threading_switch.pack(side="left", padx=(15, 5), pady=10)
-        self.worker_count_entry = customtkinter.CTkEntry(self.action_frame, width=40)
-        self.worker_count_entry.insert(0, "5") # Mặc định 5 luồng
-        self.worker_count_entry.pack(side="left", padx=0, pady=10)
+        threading_frame = customtkinter.CTkFrame(self.action_frame, fg_color="transparent")
+        threading_frame.grid(row=0, column=5, padx=10, pady=10, sticky="w")
+        self.threading_switch = customtkinter.CTkSwitch(threading_frame, text="Đa luồng", onvalue=1, offvalue=0)
+        self.threading_switch.select()
+        self.threading_switch.pack(side="left", padx=(15, 5))
+        self.worker_count_entry = customtkinter.CTkEntry(threading_frame, width=40)
+        self.worker_count_entry.insert(0, "5")
+        self.worker_count_entry.pack(side="left", padx=0)
         
-        self.download_button = customtkinter.CTkButton(self.action_frame, text="Bước 3: Tải video", command=self.start_download_task, fg_color="green")
-        self.download_button.pack(side="right", padx=10, pady=10)
-        
-        # ... (các nút còn lại giữ nguyên)
-        self.load_session_button = customtkinter.CTkButton(self.action_frame, text="Tải phiên", command=self.load_session)
-        self.load_session_button.pack(side="right", padx=0, pady=10)
-        self.save_session_button = customtkinter.CTkButton(self.action_frame, text="Lưu phiên", command=self.save_session)
-        self.save_session_button.pack(side="right", padx=10, pady=10)
-        self.import_txt_button = customtkinter.CTkButton(self.action_frame, text="Nhập TXT", command=self.import_from_txt)
-        self.import_txt_button.pack(side="right", padx=0, pady=10)
+        session_frame = customtkinter.CTkFrame(self.action_frame, fg_color="transparent")
+        session_frame.grid(row=0, column=6, padx=10, pady=10, sticky="e")
 
-        # ** Khung 4: Bảng kết quả **
+        button_text_color = "#FFFFFF"
+        button_fg_color = "#555555"
+        button_hover_color = "#444444"
+        self.save_session_button = customtkinter.CTkButton(session_frame, text="Lưu", command=self.save_session, width=80, text_color=button_text_color, fg_color=button_fg_color, hover_color=button_hover_color, text_color_disabled=DISABLED_TEXT_COLOR)
+        self.save_session_button.pack(side="left", padx=5)
+        self.load_session_button = customtkinter.CTkButton(session_frame, text="Tải", command=self.load_session, width=80, text_color=button_text_color, fg_color=button_fg_color, hover_color=button_hover_color, text_color_disabled=DISABLED_TEXT_COLOR)
+        self.load_session_button.pack(side="left", padx=0)
+        self.import_txt_button = customtkinter.CTkButton(session_frame, text="Nhập TXT", command=self.import_from_txt, width=100, text_color=button_text_color, fg_color=button_fg_color, hover_color=button_hover_color, text_color_disabled=DISABLED_TEXT_COLOR)
+        self.import_txt_button.pack(side="left", padx=5)
+        
+        self.download_button = customtkinter.CTkButton(self.action_frame, text="Bước 3: Tải Video", command=self.start_download_task, fg_color="#4CAF50", hover_color="#388E3C", width=140, text_color_disabled=DISABLED_TEXT_COLOR)
+        self.download_button.grid(row=0, column=7, padx=(0, 10), pady=10, sticky="e")
+
+        # ** Khung 3: Bảng kết quả **
         tree_frame = customtkinter.CTkFrame(self)
-        tree_frame.grid(row=3, column=0, padx=10, pady=10, sticky="nsew")
-        # ... (cấu hình Treeview không đổi)
+        tree_frame.grid(row=2, column=0, padx=10, pady=10, sticky="nsew")
+        # ... (Cấu hình treeview không đổi)
         tree_frame.grid_rowconfigure(0, weight=1)
         tree_frame.grid_columnconfigure(0, weight=1)
         columns = ("#", "selected", "title", "date", "url")
@@ -138,13 +144,13 @@ class DownloaderTab(customtkinter.CTkFrame):
         scrollbar.grid(row=0, column=1, sticky="ns")
         self.tree.configure(yscrollcommand=scrollbar.set)
         
-        self.status_label = customtkinter.CTkLabel(self, text="Sẵn sàng.", anchor="w")
+        self.status_label = customtkinter.CTkLabel(self, text="Sẵn sàng.", anchor="w", text_color="gray")
         self.status_label.grid(row=4, column=0, padx=10, pady=5, sticky="ew")
 
         self.update_button_states()
-        
+
+    # === TOÀN BỘ CÁC HÀM LOGIC ĐÃ ĐƯỢC KHÔI PHỤC ĐẦY ĐỦ ===
     def update_button_states(self, is_busy=False):
-        # ... (Nội dung hàm không đổi)
         has_results_in_tree = bool(self.tree.get_children())
         is_ready_to_filter = bool(self.scraped_links_cache)
         self.scrape_button.configure(state="disabled" if is_busy else "normal")
@@ -156,12 +162,10 @@ class DownloaderTab(customtkinter.CTkFrame):
         self.download_button.configure(state="disabled" if is_busy or not has_results_in_tree else "normal")
 
     def update_status(self, message):
-        # ... (Nội dung hàm không đổi)
         self.status_label.configure(text=message)
         logging.info(message)
 
     def request_stop_task(self):
-        # ... (Nội dung hàm không đổi)
         if self.is_running_task:
             self.stop_requested.set()
             self.update_status("Đã yêu cầu dừng, vui lòng chờ tác vụ hiện tại hoàn tất...")
@@ -201,7 +205,7 @@ class DownloaderTab(customtkinter.CTkFrame):
             self.is_running_task = False
             self.is_scraping_done = True
             self.after(0, self.update_button_states, False)
-        
+    
     def start_filtering_thread(self, source_links=None):
         links_to_process = source_links if source_links is not None else self.scraped_links_cache
         if not links_to_process:
@@ -214,14 +218,13 @@ class DownloaderTab(customtkinter.CTkFrame):
         self.stop_requested.clear()
         self.is_running_task = True
         
-        # === LOGIC CHUYỂN ĐỔI LUỒNG ===
         if self.threading_switch.get() == 1:
             try:
                 num_workers = int(self.worker_count_entry.get())
                 if num_workers < 1: num_workers = 1
-                if num_workers > 10: num_workers = 10 # Giới hạn 10 luồng để tránh quá tải
+                if num_workers > 10: num_workers = 10
             except ValueError:
-                num_workers = 5 # Mặc định nếu người dùng nhập sai
+                num_workers = 5
             
             thread = threading.Thread(target=self.get_details_worker_multithread, args=(links_to_process, num_workers))
         else:
@@ -230,16 +233,15 @@ class DownloaderTab(customtkinter.CTkFrame):
             
         self.app.worker_threads = [thread]
         thread.start()
-        
+
     def get_details_worker_singlethread(self, links_to_process):
-        # Đây là logic đơn luồng cũ
         from_date = self.from_date_entry.get_date()
         to_date = self.to_date_entry.get_date()
         try:
             total_links = len(links_to_process)
             for i, url in enumerate(links_to_process):
                 if self.stop_requested.is_set(): break
-                self.after(0, self.update_status, f"Đang lấy chi tiết video {i+1}/{total_links}...")
+                self.after(0, self.update_status, f"Đơn luồng: Đang xử lý {i+1}/{total_links}...")
                 details = get_video_details_yt_dlp(url)
                 if details and details.get('upload_date'):
                     upload_date_dt = datetime.strptime(details['upload_date'], "%Y%m%d").date()
@@ -250,14 +252,16 @@ class DownloaderTab(customtkinter.CTkFrame):
         finally:
             self.is_running_task = False
             self.after(0, self._finalize_filtering)
-    
+            
     def get_details_worker_multithread(self, links_to_process, num_workers):
-        self.update_status(f"Đang chạy đa luồng với {num_workers} worker...")
-        
+        self.update_status(f"Đa luồng: Đang chạy với {num_workers} worker...")
         with ThreadPoolExecutor(max_workers=num_workers) as executor:
             future_to_url = {executor.submit(self._fetch_and_filter_one_video, url): url for url in links_to_process}
-            
+            processed_count = 0
+            total_links = len(links_to_process)
             for future in as_completed(future_to_url):
+                processed_count += 1
+                self.after(0, self.update_status, f"Đa luồng: Đang xử lý {processed_count}/{total_links}...")
                 if self.stop_requested.is_set():
                     executor.shutdown(wait=False, cancel_futures=True)
                     break
@@ -267,17 +271,13 @@ class DownloaderTab(customtkinter.CTkFrame):
                         self.video_details_list.append(video_item)
                         self.after(0, self._insert_item_into_tree, video_item)
                 except Exception:
-                    pass # Lỗi đã được log bên trong _fetch_and_filter_one_video
-        
+                    pass
         self.is_running_task = False
         self.after(0, self._finalize_filtering_and_sort)
 
-    
     def _fetch_and_filter_one_video(self, url):
-        """Hàm nhỏ được mỗi luồng worker thực thi."""
         from_date = self.from_date_entry.get_date()
         to_date = self.to_date_entry.get_date()
-        
         details = get_video_details_yt_dlp(url)
         if details and details.get('upload_date'):
             upload_date_dt = datetime.strptime(details['upload_date'], "%Y%m%d").date()
@@ -286,37 +286,27 @@ class DownloaderTab(customtkinter.CTkFrame):
         return None
 
     def _create_video_item(self, url, details):
-        """Tạo dictionary video_item từ dữ liệu thô."""
-        return {
-            "title": details.get("title", "Không có tiêu đề"),
-            "upload_date": datetime.strptime(details['upload_date'], "%Y%m%d").date().strftime("%Y-%m-%d"),
-            "url": standardize_facebook_url(url),
-            "description": details.get("description", "Không có caption.")
-        }
-    def _finalize_filtering_and_sort(self):
-        """Hàm finalize cho đa luồng, cần sắp xếp lại vì kết quả trả về không theo thứ tự."""
-        self.video_details_list = sorted(self.video_details_list, key=lambda x: x['upload_date'], reverse=True)
-        self.tree.delete(*self.tree.get_children())
-        for item in self.video_details_list:
-            self._insert_item_into_tree(item)
-        self._finalize_filtering()
-        
+        return { "title": details.get("title", "Không có tiêu đề"), "upload_date": datetime.strptime(details['upload_date'], "%Y%m%d").date().strftime("%Y-%m-%d"), "url": standardize_facebook_url(url), "description": details.get("description", "Không có caption.") }
     
     def _insert_item_into_tree(self, item):
-        """Chèn một video item vào cuối Treeview."""
         index = len(self.tree.get_children()) + 1
         self.tree.insert("", "end", iid=str(index), values=(index, "☐", item["title"], item["upload_date"], item["url"]))
 
+    def _finalize_filtering_and_sort(self):
+        self.video_details_list = sorted(self.video_details_list, key=lambda x: x['upload_date'], reverse=True)
+        self.tree.delete(*self.tree.get_children())
+        for i, item in enumerate(self.video_details_list):
+            self.tree.insert("", "end", iid=str(i+1), values=(i + 1, "☐", item["title"], item["upload_date"], item["url"]))
+        self._finalize_filtering()
+        
     def _finalize_filtering(self):
-        """Chỉ cập nhật trạng thái và nút bấm, không sắp xếp hay vẽ lại."""
         if not self.stop_requested.is_set():
             self.update_status(f"Hoàn tất. Tìm thấy {len(self.video_details_list)} video hợp lệ.")
         else:
             self.update_status("Tác vụ đã bị dừng bởi người dùng.")
         self.update_button_states(is_busy=False)
-
+        
     def on_tree_click(self, event):
-        # ... (Nội dung hàm không đổi)
         region = self.tree.identify_region(event.x, event.y)
         if region != "cell": return
         column_id = self.tree.identify_column(event.x)
@@ -327,8 +317,7 @@ class DownloaderTab(customtkinter.CTkFrame):
             new_state = "☑" if current_values[1] == "☐" else "☐"
             current_values[1] = new_state
             self.tree.item(item_id, values=tuple(current_values))
-    
-    # ... (Các hàm còn lại không đổi)
+            
     def start_download_task(self):
         selected_items = [i for i, item_id in enumerate(self.tree.get_children()) if self.tree.item(item_id)['values'][1] == "☑"]
         if not selected_items:
@@ -376,15 +365,11 @@ class DownloaderTab(customtkinter.CTkFrame):
         if not filepath: return
         try:
             with open(filepath, 'r', encoding='utf-8') as f: loaded_data = json.load(f)
-            self.video_details_list = loaded_data # Nạp dữ liệu
+            self.video_details_list = loaded_data
             self.scraped_links_cache = [item['url'] for item in loaded_data]
             self.update_button_states(is_busy=True)
             self.tree.delete(*self.tree.get_children())
-            # Hiển thị lại cây từ dữ liệu đã nạp
-            for item in self.video_details_list:
-                self._insert_item_into_tree(item)
-            self.update_status(f"Đã tải thành công {len(self.video_details_list)} video từ phiên.")
-            self.update_button_states(is_busy=False)
+            self._finalize_filtering_and_sort()
         except Exception as e:
             self.update_status(f"Lỗi: Không thể đọc file JSON: {e}")
             self.update_button_states(is_busy=False)
@@ -402,7 +387,6 @@ class DownloaderTab(customtkinter.CTkFrame):
         if not selected_items: return
         item_id = selected_items[0]
         try:
-            # Lấy index từ STT của dòng được chọn
             item_index = int(self.tree.item(item_id)['values'][0]) - 1
             if 0 <= item_index < len(self.video_details_list):
                 found_video = self.video_details_list[item_index]
