@@ -1,7 +1,7 @@
 # file-path: src/main_app.py
-# version: 4.0 (Movable Popups & Full User Guide)
+# version: 7.0 (Robust Cookie Validation)
 # last-updated: 2025-10-08
-# description: Tích hợp popup hướng dẫn có thể di chuyển được và logic hiển thị cho người dùng mới.
+# description: Viết lại logic kiểm tra cookie để đảm bảo popup luôn hiển thị nếu cookie rỗng hoặc không hợp lệ.
 
 import customtkinter
 import logging
@@ -16,31 +16,56 @@ APP_VERSION = "0.5.0"
 
 customtkinter.set_appearance_mode("dark")
 customtkinter.set_default_color_theme("blue")
-
-# === LỚP CỬA SỔ POPUP TÙY CHỈNH, CÓ THỂ DI CHUYỂN ===
 class GuidePopup(customtkinter.CTkToplevel):
-    def __init__(self, master, title, message):
+    def __init__(self, master, title, message, show_checkbox=False, on_close_callback=None):
         super().__init__(master)
         self.title(title)
-        self.geometry("600x450")
-        self.resizable(False, False)
+        self.geometry("700x550")
+        self.resizable(True, True)
 
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(0, weight=1)
 
-        textbox = customtkinter.CTkTextbox(self, wrap="word", corner_radius=0)
-        textbox.grid(row=0, column=0, sticky="nsew")
-        textbox.insert("1.0", message)
-        textbox.configure(state="disabled")
+        # Lưu lại callback để gọi khi cửa sổ đóng
+        self.on_close_callback = on_close_callback
+        self.protocol("WM_DELETE_WINDOW", self.on_closing)
 
-        # Giữ cho cửa sổ này luôn ở trên cửa sổ chính
+        scrollable_frame = customtkinter.CTkScrollableFrame(self, label_text=title, label_font=("", 14, "bold"))
+        scrollable_frame.grid(row=0, column=0, padx=5, pady=5, sticky="nsew")
+        scrollable_frame.grid_columnconfigure(0, weight=1)
+
+        message_label = customtkinter.CTkLabel(scrollable_frame, text=message, wraplength=650, justify="left", anchor="w")
+        message_label.grid(row=0, column=0, padx=10, pady=10, sticky="w")
+        
+        # Thêm checkbox nếu được yêu cầu
+        if show_checkbox:
+            self.show_again_checkbox = customtkinter.CTkCheckBox(self, text="Không hiển thị lại hướng dẫn này")
+            self.show_again_checkbox.grid(row=1, column=0, padx=10, pady=10, sticky="w")
+
         self.transient(master)
-        self.grab_set()
+        self.after(100, self.center_window)
+
+    def center_window(self):
+        self.master.update_idletasks()
+        master_x = self.master.winfo_x()
+        master_y = self.master.winfo_y()
+        master_width = self.master.winfo_width()
+        master_height = self.master.winfo_height()
+        popup_width = self.winfo_width()
+        popup_height = self.winfo_height()
+        x = master_x + (master_width // 2) - (popup_width // 2)
+        y = master_y + (master_height // 2) - (popup_height // 2)
+        self.geometry(f"+{x}+{y}")
+
+    def on_closing(self):
+        # Nếu có callback, thực thi nó
+        if self.on_close_callback:
+            self.on_close_callback()
+        self.destroy()
 
 class MainApp(customtkinter.CTk):
     def __init__(self):
         super().__init__()
-        # ... (Phần cấu hình cửa sổ chính không đổi)
         self.title(f"FB Page Video Downloader v{APP_VERSION}")
         self.geometry("950x750")
         self.grid_columnconfigure(0, weight=1)
@@ -49,7 +74,7 @@ class MainApp(customtkinter.CTk):
         self.log_textbox.grid(row=2, column=0, padx=10, pady=(5, 10), sticky="nsew")
         self._setup_logging()
 
-        self._initialize_user_setup()
+        self.after(100, self._initialize_user_setup)
 
         self.tab_view = customtkinter.CTkTabview(self, fg_color="#2B2B2B")
         self.tab_view.grid(row=1, column=0, padx=10, pady=(10, 0), sticky="nsew")
@@ -60,39 +85,78 @@ class MainApp(customtkinter.CTk):
         self.worker_threads = []
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
 
+    def _load_settings(self):
+        """Đọc file settings.json, trả về dict rỗng nếu không có."""
+        settings_path = os.path.join(get_app_base_path(), "settings.json")
+        if os.path.exists(settings_path):
+            try:
+                with open(settings_path, 'r', encoding='utf-8') as f:
+                    return json.load(f)
+            except (json.JSONDecodeError, OSError):
+                return {}
+        return {}
+
+    def _save_settings(self, settings_data):
+        """Lưu dict vào file settings.json."""
+        settings_path = os.path.join(get_app_base_path(), "settings.json")
+        try:
+            with open(settings_path, 'w', encoding='utf-8') as f:
+                json.dump(settings_data, f, indent=4)
+        except OSError as e:
+            logging.error(f"Không thể lưu cài đặt: {e}")
+    
+    # === HÀM ĐÃ ĐƯỢC VIẾT LẠI HOÀN TOÀN ===
     def _initialize_user_setup(self):
-        """Kiểm tra file cookie và hiển thị các popup hướng dẫn khi cần thiết."""
+        """Kiểm tra sự tồn tại và tính hợp lệ của cookie, sau đó hiển thị các popup cần thiết."""
         base_path = get_app_base_path()
         json_cookie_path = os.path.join(base_path, "facebook_cookies.json")
         txt_cookie_path = os.path.join(base_path, "facebook_cookies.txt")
-        
-        # Biến cờ để quyết định có hiển thị hướng dẫn sử dụng hay không
-        show_usage_guide = False
 
-        if not os.path.exists(json_cookie_path) or not os.path.exists(txt_cookie_path):
-            logging.info("Không tìm thấy file cookie. Đang tạo file mới và hiển thị hướng dẫn.")
+        cookie_files_exist = os.path.exists(json_cookie_path) and os.path.exists(txt_cookie_path)
+        cookies_are_valid = False
+
+        if cookie_files_exist:
+            try:
+                # Kiểm tra file JSON có nội dung và là một list không rỗng
+                with open(json_cookie_path, 'r', encoding='utf-8') as f:
+                    json_content = json.load(f)
+                    is_json_valid = isinstance(json_content, list) and len(json_content) > 0
+                
+                # Kiểm tra file TXT có nội dung (kích thước > 0)
+                is_txt_valid = os.path.getsize(txt_cookie_path) > 0
+
+                if is_json_valid and is_txt_valid:
+                    cookies_are_valid = True
+                else:
+                    logging.warning("File cookie tồn tại nhưng rỗng hoặc không hợp lệ.")
+
+            except (json.JSONDecodeError, FileNotFoundError):
+                logging.error("Lỗi khi đọc file cookie.")
+                cookies_are_valid = False
+
+        # --- Logic hiển thị popup ---
+        if not cookies_are_valid:
+            # Nếu cookie không hợp lệ (hoặc không tồn tại), tạo lại file và hiển thị hướng dẫn cookie
             try:
                 with open(json_cookie_path, 'w', encoding='utf-8') as f: f.write("[]")
                 with open(txt_cookie_path, 'w', encoding='utf-8') as f: pass
                 
-                # Hiển thị hướng dẫn cookie và đánh dấu để hiển thị tiếp hướng dẫn sử dụng
-                self._show_cookie_instructions_popup()
-                show_usage_guide = True
-
+                # Hiển thị hướng dẫn cookie, và đặt hướng dẫn sử dụng làm callback để nó chỉ hiện sau khi cookie đã OK
+                self._show_cookie_instructions_popup(on_close_callback=self._check_and_show_usage_guide)
             except OSError as e:
-                messagebox.showerror("Lỗi nghiêm trọng", f"Không thể tạo file cookie tại: {base_path}\nLỗi: {e}")
+                messagebox.showerror("Lỗi nghiêm trọng", f"Không thể tạo file cookie: {e}")
                 self.after(100, self.destroy)
-                return
         else:
-            # Nếu file cookie đã có, vẫn hiển thị hướng dẫn sử dụng một lần
-            show_usage_guide = True
-        
-        # Chỉ hiển thị hướng dẫn sử dụng MỘT LẦN mỗi phiên chạy
-        if show_usage_guide:
-            # Dùng `after` để đảm bảo popup này hiện ra sau khi cửa sổ chính đã sẵn sàng
-            self.after(200, self._show_usage_guide_popup)
+            # Nếu cookie đã hợp lệ ngay từ đầu, chỉ cần kiểm tra và hiển thị hướng dẫn sử dụng
+            self._check_and_show_usage_guide()
+    
+    def _check_and_show_usage_guide(self):
+        """Kiểm tra cài đặt và chỉ hiển thị popup hướng dẫn sử dụng nếu cần."""
+        settings = self._load_settings()
+        if settings.get("show_usage_guide", True):
+            self._show_usage_guide_popup()
 
-    def _show_cookie_instructions_popup(self):
+    def _show_cookie_instructions_popup(self, on_close_callback=None):
         title = "Chào mừng! Cần Thiết lập Cookie để Bắt đầu"
         message = (
             "Chào mừng bạn đến với FB Page Video Downloader!\n\n"
@@ -101,10 +165,12 @@ class MainApp(customtkinter.CTk):
             "1. CÀI ĐẶT \"COOKIE-EDITOR\":\n"
             "   - Mở trình duyệt Chrome/Edge và tìm kiếm \"Cookie-Editor\" trong cửa hàng tiện ích.\n"
             "   - Thêm tiện ích này vào trình duyệt của bạn.\n\n"
+            "   - Bấm vào nút ghim tiện ích Cookie-Editor để nó luôn hiển thị trên thanh công cụ.\n\n"
             "2. TRUY CẬP FACEBOOK:\n"
             "   - Mở một tab mới và truy cập trang `www.facebook.com`. Đăng nhập nếu bạn chưa đăng nhập.\n\n"
             "3. XUẤT COOKIE (2 LẦN):\n"
             "   - Nhấp vào biểu tượng \"Cookie-Editor\" trên thanh công cụ.\n"
+            "   - Nếu có popup yêu cầu quyền, hãy chấp nhận (chọn All Sites).\n"
             "   - Lần 1 (Định dạng JSON):\n"
             "     - Chọn \"Export\" -> \"Export as JSON\".\n"
             "     - Sao chép TOÀN BỘ nội dung.\n"
@@ -116,12 +182,13 @@ class MainApp(customtkinter.CTk):
             "4. KHỞI ĐỘNG LẠI:\n"
             "   - Sau khi đã lưu cả 2 file, hãy đóng và mở lại ứng dụng này."
         )
-        GuidePopup(self, title, message)
+        GuidePopup(self, title, message, on_close_callback=on_close_callback)
 
     def _show_usage_guide_popup(self):
         title = "Hướng dẫn Sử dụng Nhanh"
         message = (
             "Mẹo: Bạn có thể kéo và di chuyển bảng hướng dẫn này sang một bên để vừa đọc vừa thao tác trên giao diện chính của chương trình.\n\n"
+            "Bạn có thể kéo dãn chương trình này để hiển thị các nút được đầy đủ.\n\n"
             "---\n\n"
             "BƯỚC 1: LẤY LINK VIDEO\n"
             "   - URL Trang Facebook: Dán link đến trang video hoặc reels của một Page.\n"
@@ -140,12 +207,19 @@ class MainApp(customtkinter.CTk):
             "   - Lưu/Tải phiên: Lưu lại kết quả đã lọc để làm việc sau.\n"
             "   - Nhập TXT: Nhập danh sách link video từ một file `.txt`."
         )
-        GuidePopup(self, title, message)
-
-    def _show_cookie_instructions_popup(self):
-        """Hiển thị hộp thoại hướng dẫn người dùng cách lấy cookie."""
-        instructions = "Chào mừng bạn! Để ứng dụng hoạt động, bạn cần cung cấp cookie...\n\n(Nội dung hướng dẫn chi tiết)" # Giữ ngắn gọn cho ví dụ
-        messagebox.showinfo("Hướng dẫn Thiết lập Cookie", instructions)
+        
+        # Hàm callback sẽ được gọi khi popup hướng dẫn sử dụng đóng lại
+        def on_guide_close():
+            # Kiểm tra trạng thái của checkbox và lưu cài đặt
+            if popup.show_again_checkbox.get() == 1: # 1 là trạng thái "đã check"
+                settings = self._load_settings()
+                settings["show_usage_guide"] = False
+                self._save_settings(settings)
+                logging.info("Đã lưu cài đặt: Sẽ không hiển thị lại hướng dẫn sử dụng.")
+        
+        popup = GuidePopup(self, title, message, show_checkbox=True, on_close_callback=on_guide_close)
+    
+        
     # === KẾT THÚC PHẦN BỔ SUNG ===
     
     def on_closing(self):

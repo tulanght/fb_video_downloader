@@ -1,7 +1,7 @@
 # file-path: src/ui/downloader_tab.py
-# version: 30.0 (Final UI Hotfix)
+# version: 31.0 (Final Layout Fix)
 # last-updated: 2025-10-08
-# description: Sửa lỗi crash do tham số không hợp lệ và cải thiện độ tương phản cho các nút bị vô hiệu hóa.
+# description: Sắp xếp lại action_frame bằng grid để sửa lỗi che khuất widget.
 
 import customtkinter
 import threading
@@ -78,12 +78,13 @@ class DownloaderTab(customtkinter.CTkFrame):
         self.stop_button = customtkinter.CTkButton(self.top_frame, text="Dừng", command=self.request_stop_task, fg_color="#D32F2F", hover_color="#B71C1C", width=60, text_color_disabled=DISABLED_TEXT_COLOR)
         self.stop_button.grid(row=0, column=7, padx=(0, 10), pady=10)
 
-        # ** Khung 2: Lọc và các hành động **
+        # ** Khung 2: Lọc và các hành động (ĐƯỢC THIẾT KẾ LẠI) **
         self.action_frame = customtkinter.CTkFrame(self)
         self.action_frame.grid(row=1, column=0, padx=10, pady=5, sticky="ew")
-        self.action_frame.grid_columnconfigure(5, weight=1)
+        # Sử dụng grid để kiểm soát vị trí chính xác
+        self.action_frame.grid_columnconfigure(5, weight=1) # Cột co giãn ở giữa
         
-        self.filter_button = customtkinter.CTkButton(self.action_frame, text="Bước 2: Lọc & Lấy Chi Tiết", command=self.start_filtering_thread, width=180, text_color_disabled=DISABLED_TEXT_COLOR)
+        self.filter_button = customtkinter.CTkButton(self.action_frame, text="Bước 2: Lọc", command=self.start_filtering_thread, text_color_disabled=DISABLED_TEXT_COLOR)
         self.filter_button.grid(row=0, column=0, padx=(10,5), pady=10)
         
         customtkinter.CTkLabel(self.action_frame, text="Từ:").grid(row=0, column=1, padx=(10, 5), pady=10)
@@ -94,15 +95,17 @@ class DownloaderTab(customtkinter.CTkFrame):
         self.to_date_entry = DateEntry(self.action_frame, date_pattern='y-mm-dd', width=12)
         self.to_date_entry.grid(row=0, column=4, padx=0, pady=10)
 
+        # Đặt nhóm đa luồng vào một khung riêng để dễ quản lý
         threading_frame = customtkinter.CTkFrame(self.action_frame, fg_color="transparent")
-        threading_frame.grid(row=0, column=5, padx=10, pady=10, sticky="w")
+        threading_frame.grid(row=0, column=5, padx=(20,0), pady=10, sticky="w")
         self.threading_switch = customtkinter.CTkSwitch(threading_frame, text="Đa luồng", onvalue=1, offvalue=0)
         self.threading_switch.select()
-        self.threading_switch.pack(side="left", padx=(15, 5))
+        self.threading_switch.pack(side="left")
         self.worker_count_entry = customtkinter.CTkEntry(threading_frame, width=40)
         self.worker_count_entry.insert(0, "5")
-        self.worker_count_entry.pack(side="left", padx=0)
+        self.worker_count_entry.pack(side="left", padx=5)
         
+        # Nhóm các nút phụ về bên phải
         session_frame = customtkinter.CTkFrame(self.action_frame, fg_color="transparent")
         session_frame.grid(row=0, column=6, padx=10, pady=10, sticky="e")
 

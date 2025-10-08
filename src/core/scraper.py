@@ -1,7 +1,7 @@
 # file-path: src/core/scraper.py
-# version: 22.0 (Add Scroll Delay)
+# version: 22.0 (Auto-update Chromedriver)
 # last-updated: 2025-10-08
-# description: Thêm tham số scroll_delay để người dùng có thể tùy chỉnh thời gian chờ giữa các lần cuộn.
+# description: Tích hợp webdriver-manager để tự động tải và quản lý chromedriver.
 
 import logging
 import re
@@ -14,6 +14,8 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
+# === THAY ĐỔI: Thêm import mới ===
+from webdriver_manager.chrome import ChromeDriverManager
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -36,7 +38,6 @@ def get_video_details_yt_dlp(video_url: str) -> dict:
     except Exception:
         return None
 
-# === THAY ĐỔI: Thêm scroll_delay vào chữ ký hàm ===
 def scrape_video_urls(page_url, scroll_count, status_callback, stop_requested, scroll_delay):
     chrome_options = Options()
     chrome_options.add_argument("--headless")
@@ -44,13 +45,17 @@ def scrape_video_urls(page_url, scroll_count, status_callback, stop_requested, s
     chrome_options.add_argument("--log-level=3")
     chrome_options.add_experimental_option('excludeSwitches', ['enable-logging'])
     
-    service = Service(executable_path="chromedriver.exe")
-    driver = webdriver.Chrome(service=service, options=chrome_options)
-    
+    driver = None
     ordered_video_links = []
     seen_urls = set()
 
     try:
+        # === THAY ĐỔI: Tự động cài đặt và sử dụng chromedriver ===
+        status_callback("Đang kiểm tra/cập nhật trình điều khiển Chrome...")
+        service = Service(ChromeDriverManager().install())
+        driver = webdriver.Chrome(service=service, options=chrome_options)
+        # === KẾT THÚC THAY ĐỔI ===
+        
         driver.get("https://www.facebook.com")
         status_callback("Đang tải cookie (JSON)...")
         time.sleep(1)
@@ -69,7 +74,6 @@ def scrape_video_urls(page_url, scroll_count, status_callback, stop_requested, s
                 break
             status_callback(f"Đang cuộn trang... ({i+1}/{scroll_count})")
             driver.find_element(By.TAG_NAME, 'body').send_keys(Keys.END)
-            # === THAY ĐỔI: Sử dụng giá trị scroll_delay từ người dùng ===
             time.sleep(scroll_delay)
 
         anchor_tags = driver.find_elements(By.TAG_NAME, 'a')
@@ -81,8 +85,15 @@ def scrape_video_urls(page_url, scroll_count, status_callback, stop_requested, s
                     seen_urls.add(clean_href)
                     ordered_video_links.append(clean_href)
 
-    except Exception:
+    except Exception as e:
+        # Báo lỗi cụ thể hơn nếu webdriver-manager thất bại
+        error_msg = str(e)
+        if "offline" in error_msg.lower():
+            status_callback("Lỗi: Không có kết nối mạng để tải/cập nhật trình điều khiển Chrome.")
+        else:
+            status_callback(f"Lỗi Selenium/Chromedriver: {e}")
         logging.error(traceback.format_exc())
     finally:
-        driver.quit()
+        if driver:
+            driver.quit()
         return ordered_video_links
