@@ -1,7 +1,7 @@
 # QUY TRÌNH LÀM VIỆC DỰ ÁN (Project Workflow)
-# version: 1.2
-# last-updated: 2025-10-03
-# description: Bổ sung bước xóa nhánh sau khi hợp nhất (merge).
+# version: 2.0
+# last-updated: 2025-10-08
+# description: Đại tu quy trình làm việc, giới thiệu "Quy ước Kiến trúc sư" và các quy tắc giao tiếp mới.
 
 ## 1. Triết lý Chung
 * **Nguồn sự thật duy nhất:** Nhánh `main` là nền tảng ổn định. Mọi thứ trên `main` phải luôn ở trạng thái chạy được.
@@ -19,61 +19,48 @@
 * **Tái cấu trúc:** `refactor/<pham-vi>` (ví dụ: `refactor/database-queries`)
 
 ### 2.2. Quy ước Commit Message
-* Sử dụng **Conventional Commits** (`<type>(<scope>): <subject>`).
-* Ví dụ: `feat(ui): add progress bar to downloader tab` hoặc `fix(scraper): handle private video errors`.
+Sử dụng tiền tố để làm rõ mục đích của commit:
+* `feat:` (tính năng mới)
+* `fix:` (sửa lỗi)
+* `docs:` (cập nhật tài liệu)
+* `style:` (thay đổi về định dạng, không ảnh hưởng logic)
+* `refactor:` (tái cấu trúc mã nguồn)
+* `test:` (thêm hoặc sửa test)
+* `chore:` (các công việc khác như cập nhật build script)
 
-### 2.3. Quy trình Hợp nhất và Dọn dẹp
-Sau khi một nhánh `feature` hoặc `fix` đã được kiểm thử và sẵn sàng, quy trình hợp nhất vào `main` sẽ bao gồm các bước sau:
-1.  **Cập nhật `main`:**
-    ```bash
-    git checkout main
-    git pull origin main
-    ```
-2.  **Hợp nhất nhánh:**
-    ```bash
-    git merge <ten-nhanh-feature>
-    ```
-3.  **Đẩy `main` lên remote:**
-    ```bash
-    git push origin main
-    ```
-4.  **Dọn dẹp (Cleanup):**
-    ```bash
-    # Xóa nhánh ở máy cục bộ
-    git branch -d <ten-nhanh-feature>
-
-    # Xóa nhánh ở trên GitHub (tùy chọn nhưng được khuyến khích)
-    git push origin --delete <ten-nhanh-feature>
-    ```
+### 2.3. Luồng làm việc cơ bản
+1.  **Tạo nhánh:** `git checkout -b <ten-nhanh>`
+2.  **Làm việc & Commit:**
+    * `git add <cac-file-thay-doi>`
+    * `git commit -m "<tien-to>: <noi-dung-commit>"`
+3.  **Hợp nhất vào main:**
+    * `git checkout main`
+    * `git merge <ten-nhanh>`
+4.  **Xóa nhánh (sau khi đã hợp nhất):**
+    * `git branch -d <ten-nhanh>`
+5.  **Đẩy lên Repository:**
+    * `git push origin main` (và `git push origin --tags` nếu có tạo tag mới)
 
 ---
-## 3. Quy trình Cộng tác với Gemini AI (BẮT BUỘC)
+## 3. Quy ước Tương tác với AI (Gemini)
 
-### 3.1. Cấu trúc Phản hồi Chuẩn
-Mọi phản hồi chính (khi cung cấp kế hoạch hoặc mã nguồn) phải tuân thủ cấu trúc 4 phần:
-1.  **Phần 1:** Phân tích & Kế hoạch
-2.  **Phần 2:** Gói Cập Nhật Mục Tiêu (Mã nguồn)
-3.  **Phần 3:** Hướng dẫn Hành động & Lệnh Git
-4.  **Phần 4:** Kết quả Kỳ vọng & Cảnh báo
+### 3.1. Mô hình Hợp tác
+* **Mô hình "Kiến trúc sư & Người triển khai":**
+    * **Người dùng (Kiến trúc sư):** Đưa ra yêu cầu, định hình sản phẩm, thiết kế tính năng và phê duyệt hướng đi.
+    * **AI (Người triển khai):** Đề xuất giải pháp kỹ thuật, viết mã nguồn theo yêu cầu và tuân thủ nghiêm ngặt quy trình.
 
-### 3.2. Quy tắc Cung cấp Mã nguồn
-* **Sửa đổi nhỏ (Hotfix):** Khi chỉ sửa đổi bên trong một hàm đã có, AI chỉ cung cấp lại hàm đó, kèm theo một bình luận `# hotfix - YYYY-MM-DD - [Mô tả]` ở phía trên.
-* **Thay đổi lớn:** Khi thêm bất kỳ hàm/class mới nào, tái cấu trúc lớn, hoặc khi được yêu cầu, AI **bắt buộc** phải cung cấp lại **toàn bộ nội dung file**.
+### 3.2. Giao tiếp bằng "Bản vá Code" (Code Patch)
+* Mọi thay đổi về code sẽ được ưu tiên giao tiếp bằng định dạng **"Bản vá Code"** (Tìm và Thay thế), chỉ rõ file và hàm/dòng cần thay đổi.
+* AI chỉ được cung cấp toàn bộ nội dung file khi tạo file mới hoặc khi có sự thay đổi lớn (trên 70%) và đã được Kiến trúc sư phê duyệt trước.
 
-### 3.3. Luồng làm việc
-* **Thay đổi Lớn / Phức tạp:** Tuân thủ quy trình 2 giai đoạn:
-    1.  **Giai đoạn 1 - Phân tích & Xin Phê duyệt:** AI trình bày kế hoạch chi tiết và chờ người dùng đồng ý.
-    2.  **Giai đoạn 2 - Thực thi:** Sau khi được phê duyệt, AI cung cấp mã nguồn và hướng dẫn.
-* **Thay đổi Nhỏ / Sửa lỗi:**
-    1.  **Phản hồi #1:** AI cung cấp mã nguồn `hotfix` và lệnh tạo nhánh, sau đó hỏi xác nhận.
-    2.  **Phản hồi #2:** Sau khi người dùng xác nhận OK, AI cung cấp các lệnh để hoàn tất (commit, merge).
+### 3.3. Quy tắc "Module hóa"
+* Chủ động chia nhỏ các file dài. Mọi file mới được tạo ra sẽ cố gắng giữ dưới 200 dòng.
+* Các file hiện có quá dài sẽ là đối tượng ưu tiên để tái cấu trúc trong các giai đoạn "Dọn dẹp".
 
-### 3.4. Cơ chế An toàn
+### 3.4. Quy tắc "Phê duyệt Thiết kế"
+* AI **TUYỆT ĐỐI KHÔNG** được cung cấp bất kỳ mã nguồn nào cho một tính năng mới hoặc thay đổi kiến trúc lớn cho đến khi Kiến trúc sư (Người dùng) đưa ra lời xác nhận rõ ràng (ví dụ: "OK, tôi đồng ý với kế hoạch này", "Hãy bắt đầu triển khai").
+
+### 3.5. Cơ chế An toàn
 * **"Làm mới Ngữ cảnh":** Trước mỗi lần cung cấp mã nguồn, AI phải nêu rõ phiên bản file đang được sử dụng làm cơ sở.
 * **"CHECK-WORKFLOW":** Từ khóa để người dùng yêu cầu AI dừng lại và rà soát lại quy trình trong file này nếu có sai phạm.
 * **Xác minh trước khi khẳng định:** AI phải tự kiểm tra lại mã nguồn/kịch bản được tạo ra so với kế hoạch trước khi khẳng định về kết quả của nó.
-
-### 3.5. Môi trường Làm việc & Công cụ (VSCode)
-* **Editor chính:** Visual Studio Code.
-* **Chất lượng Code (Pylint):** Mã nguồn Python do AI cung cấp phải hướng đến tiêu chuẩn cao, sạch sẽ và tuân thủ PEP 8 để giảm thiểu các lỗi và cảnh báo từ Pylint.
-* **Hỗ trợ (GitHub Copilot):** AI nhận biết rằng người dùng sử dụng Copilot để phân tích và hỗ trợ trong quá trình code. Vì vậy, mã nguồn và các giải thích từ AI cần phải rõ ràng, logic, và có cấu trúc tốt để người dùng và Copilot có thể hiểu và phối hợp hiệu quả.
