@@ -18,7 +18,8 @@ import yt_dlp
 from src.core.scraper import scrape_video_urls, get_video_details_yt_dlp, standardize_facebook_url
 from src.core.downloader import download_video_session
 from src.ui.components import CaptionViewerWindow
-
+from src.core.app_path import get_app_base_path
+from src import config
 
 class DownloaderTab(customtkinter.CTkFrame):
     def __init__(self, master, app_ref):
@@ -34,9 +35,6 @@ class DownloaderTab(customtkinter.CTkFrame):
 
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(2, weight=1)
-
-        # === KHAI BÁO MÀU SẮC ĐỂ DỄ QUẢN LÝ ===
-        DISABLED_TEXT_COLOR = "#BFBFBF" # Một màu xám rất sáng, dễ đọc
 
         # ** Khung 1: Input & Cấu hình cuộn trang **
         self.top_frame = customtkinter.CTkFrame(self)
@@ -58,9 +56,9 @@ class DownloaderTab(customtkinter.CTkFrame):
         self.scroll_delay_entry.grid(row=0, column=5, padx=0, pady=10)
 
         # === SỬA LỖI: Chỉ dùng text_color_disabled ===
-        self.scrape_button = customtkinter.CTkButton(self.top_frame, text="Bước 1: Lấy Link", command=self.start_scraping_thread, width=120, text_color_disabled=DISABLED_TEXT_COLOR)
+        self.scrape_button = customtkinter.CTkButton(self.top_frame, text="Bước 1: Lấy Link", command=self.start_scraping_thread, width=120, text_color_disabled=config.DISABLED_TEXT_COLOR)
         self.scrape_button.grid(row=0, column=6, padx=(20, 10), pady=10)
-        self.stop_button = customtkinter.CTkButton(self.top_frame, text="Dừng", command=self.request_stop_task, fg_color="#D32F2F", hover_color="#B71C1C", width=60, text_color_disabled=DISABLED_TEXT_COLOR)
+        self.stop_button = customtkinter.CTkButton(self.top_frame, text="Dừng", command=self.request_stop_task, fg_color="#D32F2F", hover_color="#B71C1C", width=60, text_color_disabled=config.DISABLED_TEXT_COLOR)
         self.stop_button.grid(row=0, column=7, padx=(0, 10), pady=10)
 
         # ** Khung 2: Lọc và các hành động (ĐƯỢC THIẾT KẾ LẠI) **
@@ -69,7 +67,7 @@ class DownloaderTab(customtkinter.CTkFrame):
         # Sử dụng grid để kiểm soát vị trí chính xác
         self.action_frame.grid_columnconfigure(5, weight=1) # Cột co giãn ở giữa
         
-        self.filter_button = customtkinter.CTkButton(self.action_frame, text="Bước 2: Lọc", command=self.start_filtering_thread, text_color_disabled=DISABLED_TEXT_COLOR)
+        self.filter_button = customtkinter.CTkButton(self.action_frame, text="Bước 2: Lọc", command=self.start_filtering_thread, text_color_disabled=config.DISABLED_TEXT_COLOR)
         self.filter_button.grid(row=0, column=0, padx=(10,5), pady=10)
         
         customtkinter.CTkLabel(self.action_frame, text="Từ:").grid(row=0, column=1, padx=(10, 5), pady=10)
@@ -94,17 +92,14 @@ class DownloaderTab(customtkinter.CTkFrame):
         session_frame = customtkinter.CTkFrame(self.action_frame, fg_color="transparent")
         session_frame.grid(row=0, column=6, padx=10, pady=10, sticky="e")
 
-        button_text_color = "#FFFFFF"
-        button_fg_color = "#555555"
-        button_hover_color = "#444444"
-        self.save_session_button = customtkinter.CTkButton(session_frame, text="Lưu", command=self.save_session, width=80, text_color=button_text_color, fg_color=button_fg_color, hover_color=button_hover_color, text_color_disabled=DISABLED_TEXT_COLOR)
+        self.save_session_button = customtkinter.CTkButton(session_frame, text="Lưu", command=self.save_session, width=80, text_color=config.BUTTON_TEXT_COLOR, fg_color=config.BUTTON_FG_COLOR, hover_color=config.BUTTON_HOVER_COLOR, text_color_disabled=config.DISABLED_TEXT_COLOR)
         self.save_session_button.pack(side="left", padx=5)
-        self.load_session_button = customtkinter.CTkButton(session_frame, text="Tải", command=self.load_session, width=80, text_color=button_text_color, fg_color=button_fg_color, hover_color=button_hover_color, text_color_disabled=DISABLED_TEXT_COLOR)
+        self.load_session_button = customtkinter.CTkButton(session_frame, text="Tải", command=self.load_session, width=80, text_color=config.BUTTON_TEXT_COLOR, fg_color=config.BUTTON_FG_COLOR, hover_color=config.BUTTON_HOVER_COLOR, text_color_disabled=config.DISABLED_TEXT_COLOR)
         self.load_session_button.pack(side="left", padx=0)
-        self.import_txt_button = customtkinter.CTkButton(session_frame, text="Nhập TXT", command=self.import_from_txt, width=100, text_color=button_text_color, fg_color=button_fg_color, hover_color=button_hover_color, text_color_disabled=DISABLED_TEXT_COLOR)
+        self.import_txt_button = customtkinter.CTkButton(session_frame, text="Nhập TXT", command=self.import_from_txt, width=100, text_color=config.BUTTON_TEXT_COLOR, fg_color=config.BUTTON_FG_COLOR, hover_color=config.BUTTON_HOVER_COLOR, text_color_disabled=config.DISABLED_TEXT_COLOR)
         self.import_txt_button.pack(side="left", padx=5)
         
-        self.download_button = customtkinter.CTkButton(self.action_frame, text="Bước 3: Tải Video", command=self.start_download_task, fg_color="#4CAF50", hover_color="#388E3C", width=140, text_color_disabled=DISABLED_TEXT_COLOR)
+        self.download_button = customtkinter.CTkButton(self.action_frame, text="Bước 3: Tải Video", command=self.start_download_task, fg_color="#4CAF50", hover_color="#388E3C", width=140, text_color_disabled=config.DISABLED_TEXT_COLOR)
         self.download_button.grid(row=0, column=7, padx=(0, 10), pady=10, sticky="e")
 
         # ** Khung 3: Bảng kết quả **
@@ -210,9 +205,9 @@ class DownloaderTab(customtkinter.CTkFrame):
             try:
                 num_workers = int(self.worker_count_entry.get())
                 if num_workers < 1: num_workers = 1
-                if num_workers > 10: num_workers = 10
+                if num_workers > config.MAX_WORKERS: num_workers = config.MAX_WORKERS
             except ValueError:
-                num_workers = 5
+                num_workers = config.DEFAULT_WORKER_COUNT
             
             thread = threading.Thread(target=self.get_details_worker_multithread, args=(links_to_process, num_workers))
         else:
@@ -341,7 +336,16 @@ class DownloaderTab(customtkinter.CTkFrame):
         if not self.video_details_list:
             self.update_status("Không có dữ liệu để lưu.")
             return
-        filepath = filedialog.asksaveasfilename(defaultextension=".json", filetypes=[("JSON files", "*.json")], title="Lưu phiên làm việc")
+            
+        sessions_dir = os.path.join(get_app_base_path(), config.SESSIONS_DIR)
+        os.makedirs(sessions_dir, exist_ok=True)
+        
+        filepath = filedialog.asksaveasfilename(
+            defaultextension=".json",
+            filetypes=[("JSON files", "*.json")],
+            title="Lưu phiên làm việc",
+            initialdir=sessions_dir
+        )
         if not filepath: return
         try:
             with open(filepath, 'w', encoding='utf-8') as f: json.dump(self.video_details_list, f, indent=4, ensure_ascii=False)
@@ -349,7 +353,13 @@ class DownloaderTab(customtkinter.CTkFrame):
         except Exception as e: self.update_status(f"Lỗi: Không thể lưu file: {e}")
 
     def load_session(self):
-        filepath = filedialog.askopenfilename(filetypes=[("JSON files", "*.json")], title="Tải phiên làm việc")
+        sessions_dir = os.path.join(get_app_base_path(), config.SESSIONS_DIR)
+        
+        filepath = filedialog.askopenfilename(
+            filetypes=[("JSON files", "*.json")],
+            title="Tải phiên làm việc",
+            initialdir=sessions_dir
+        )
         if not filepath: return
         try:
             with open(filepath, 'r', encoding='utf-8') as f: loaded_data = json.load(f)

@@ -8,19 +8,19 @@ import logging
 import os
 import json
 from tkinter import messagebox
-from src.ui.downloader_tab import DownloaderTab
 from src.ui.components import GuidePopup
+from src.ui.downloader_tab import DownloaderTab
 from src.core.ui_logger import CTkTextboxHandler
 from src.core.app_path import get_app_base_path
-
-APP_VERSION = "0.5.4"
+# Thêm import config
+from src import config
 
 customtkinter.set_appearance_mode("dark")
 customtkinter.set_default_color_theme("blue")
 class MainApp(customtkinter.CTk):
     def __init__(self):
         super().__init__()
-        self.title(f"FB Page Video Downloader v{APP_VERSION}")
+        self.title(f"FB Page Video Downloader v{config.APP_VERSION}")
         self.geometry("950x750")
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(1, weight=1) 
@@ -41,7 +41,7 @@ class MainApp(customtkinter.CTk):
 
     def _load_settings(self):
         """Đọc file settings.json, trả về dict rỗng nếu không có."""
-        settings_path = os.path.join(get_app_base_path(), "settings.json")
+        settings_path = os.path.join(get_app_base_path(), config.SETTINGS_FILE)
         if os.path.exists(settings_path):
             try:
                 with open(settings_path, 'r', encoding='utf-8') as f:
@@ -52,19 +52,19 @@ class MainApp(customtkinter.CTk):
 
     def _save_settings(self, settings_data):
         """Lưu dict vào file settings.json."""
-        settings_path = os.path.join(get_app_base_path(), "settings.json")
+        settings_path = os.path.join(get_app_base_path(), config.SETTINGS_FILE)
         try:
             with open(settings_path, 'w', encoding='utf-8') as f:
                 json.dump(settings_data, f, indent=4)
         except OSError as e:
             logging.error(f"Không thể lưu cài đặt: {e}")
-    
+      
     # === HÀM ĐÃ ĐƯỢC VIẾT LẠI HOÀN TOÀN ===
     def _initialize_user_setup(self):
         """Kiểm tra sự tồn tại và tính hợp lệ của cookie, sau đó hiển thị các popup cần thiết."""
         base_path = get_app_base_path()
-        json_cookie_path = os.path.join(base_path, "facebook_cookies.json")
-        txt_cookie_path = os.path.join(base_path, "facebook_cookies.txt")
+        json_cookie_path = os.path.join(base_path, config.COOKIE_JSON_FILE)
+        txt_cookie_path = os.path.join(base_path, config.COOKIE_TXT_FILE)
 
         cookie_files_exist = os.path.exists(json_cookie_path) and os.path.exists(txt_cookie_path)
         cookies_are_valid = False
