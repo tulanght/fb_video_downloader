@@ -17,22 +17,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import yt_dlp
 from src.core.scraper import scrape_video_urls, get_video_details_yt_dlp, standardize_facebook_url
 from src.core.downloader import download_video_session
-from customtkinter import CTkToplevel
-
-class CaptionViewerWindow(CTkToplevel):
-    # ... (Nội dung lớp không đổi)
-    def __init__(self, title, caption):
-        super().__init__()
-        self.title("Nội dung Caption")
-        self.geometry("600x400")
-        self.grid_columnconfigure(0, weight=1)
-        self.grid_rowconfigure(1, weight=1)
-        title_label = customtkinter.CTkLabel(self, text=title, font=customtkinter.CTkFont(size=14, weight="bold"))
-        title_label.grid(row=0, column=0, padx=10, pady=10, sticky="w")
-        caption_textbox = customtkinter.CTkTextbox(self, wrap="word")
-        caption_textbox.grid(row=1, column=0, padx=10, pady=(0, 10), sticky="nsew")
-        caption_textbox.insert("1.0", caption)
-        caption_textbox.configure(state="disabled")
+from src.ui.components import CaptionViewerWindow
 
 
 class DownloaderTab(customtkinter.CTkFrame):
@@ -390,13 +375,18 @@ class DownloaderTab(customtkinter.CTkFrame):
         if not selected_items: return
         item_id = selected_items[0]
         try:
+            # Lấy index từ STT của dòng được chọn
             item_index = int(self.tree.item(item_id)['values'][0]) - 1
             if 0 <= item_index < len(self.video_details_list):
                 found_video = self.video_details_list[item_index]
                 if self.caption_window is None or not self.caption_window.winfo_exists():
-                    self.caption_window = CaptionViewerWindow(title=found_video.get('title', 'N/A'), caption=found_video.get('description', 'Không có caption.'))
-                    self.caption_window.transient(self.app)
-                    self.caption_window.grab_set()
-                else: self.caption_window.focus()
+                    # SỬA LỖI: Thêm 'master=self.app' và loại bỏ các lệnh gọi thừa
+                    self.caption_window = CaptionViewerWindow(
+                        master=self.app, 
+                        title=found_video.get('title', 'N/A'), 
+                        caption=found_video.get('description', 'Không có caption.')
+                    )
+                else:
+                    self.caption_window.focus()
         except (ValueError, IndexError):
             self.update_status("Lỗi khi lấy caption.")

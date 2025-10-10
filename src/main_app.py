@@ -9,6 +9,7 @@ import os
 import json
 from tkinter import messagebox
 from src.ui.downloader_tab import DownloaderTab
+from src.ui.components import GuidePopup
 from src.core.ui_logger import CTkTextboxHandler
 from src.core.app_path import get_app_base_path
 
@@ -16,53 +17,6 @@ APP_VERSION = "0.5.4"
 
 customtkinter.set_appearance_mode("dark")
 customtkinter.set_default_color_theme("blue")
-class GuidePopup(customtkinter.CTkToplevel):
-    def __init__(self, master, title, message, show_checkbox=False, on_close_callback=None):
-        super().__init__(master)
-        self.title(title)
-        self.geometry("700x550")
-        self.resizable(True, True)
-
-        self.grid_columnconfigure(0, weight=1)
-        self.grid_rowconfigure(0, weight=1)
-
-        # Lưu lại callback để gọi khi cửa sổ đóng
-        self.on_close_callback = on_close_callback
-        self.protocol("WM_DELETE_WINDOW", self.on_closing)
-
-        scrollable_frame = customtkinter.CTkScrollableFrame(self, label_text=title, label_font=("", 14, "bold"))
-        scrollable_frame.grid(row=0, column=0, padx=5, pady=5, sticky="nsew")
-        scrollable_frame.grid_columnconfigure(0, weight=1)
-
-        message_label = customtkinter.CTkLabel(scrollable_frame, text=message, wraplength=650, justify="left", anchor="w")
-        message_label.grid(row=0, column=0, padx=10, pady=10, sticky="w")
-        
-        # Thêm checkbox nếu được yêu cầu
-        if show_checkbox:
-            self.show_again_checkbox = customtkinter.CTkCheckBox(self, text="Không hiển thị lại hướng dẫn này")
-            self.show_again_checkbox.grid(row=1, column=0, padx=10, pady=10, sticky="w")
-
-        self.transient(master)
-        self.after(100, self.center_window)
-
-    def center_window(self):
-        self.master.update_idletasks()
-        master_x = self.master.winfo_x()
-        master_y = self.master.winfo_y()
-        master_width = self.master.winfo_width()
-        master_height = self.master.winfo_height()
-        popup_width = self.winfo_width()
-        popup_height = self.winfo_height()
-        x = master_x + (master_width // 2) - (popup_width // 2)
-        y = master_y + (master_height // 2) - (popup_height // 2)
-        self.geometry(f"+{x}+{y}")
-
-    def on_closing(self):
-        # Nếu có callback, thực thi nó
-        if self.on_close_callback:
-            self.on_close_callback()
-        self.destroy()
-
 class MainApp(customtkinter.CTk):
     def __init__(self):
         super().__init__()
