@@ -10,6 +10,7 @@ import json
 from tkinter import messagebox
 from src.ui.components import GuidePopup
 from src.ui.downloader_tab import DownloaderTab
+from src.ui.single_downloader_tab import SingleDownloaderTab
 from src.core.ui_logger import CTkTextboxHandler
 from src.core.app_path import get_app_base_path
 # Thêm import config
@@ -35,6 +36,11 @@ class MainApp(customtkinter.CTk):
         self.tab_view.add("Downloader")
         self.downloader_tab = DownloaderTab(master=self.tab_view.tab("Downloader"), app_ref=self)
         self.downloader_tab.pack(expand=True, fill="both")
+        
+        # Thêm Tab mới
+        self.tab_view.add("Tải Video Đơn")
+        self.single_downloader_tab = SingleDownloaderTab(master=self.tab_view.tab("Tải Video Đơn"), app_ref=self)
+        self.single_downloader_tab.pack(expand=True, fill="both")
 
         self.worker_threads = []
         self.protocol("WM_DELETE_WINDOW", self.on_closing)

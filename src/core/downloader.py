@@ -53,14 +53,19 @@ def download_video_session(video_list: list, identifier: str, status_callback, p
     for i, video in enumerate(video_list):
         current_video_title = video.get('title', 'video_khong_tieu_de')
         status_callback(f"Bắt đầu tải video {i+1}/{total_videos}: {current_video_title[:40]}...")
-        progress_callback("0.0%")
+        if progress_callback:
+            progress_callback("0.0%")
 
         def progress_hook(d):
             if d['status'] == 'downloading':
-                percent_str = re.sub(r'\x1b\[[0-9;]*m', '', d.get('_percent_str', '0.0%')).strip()
-                progress_callback(percent_str)
-            elif d['status'] == 'finished':
-                progress_callback("100.0%")
+                total_bytes = d.get('total_bytes') or d.get('total_bytes_estimate', 0)
+                downloaded_bytes = d.get('downloaded_bytes', 0)
+                if total_bytes > 0:
+                    progress = (downloaded_bytes / total_bytes) * 100
+                    progress_str = f"{progress:.1f}%"
+                    # === THAY ĐỔI: Chỉ gọi callback nếu nó tồn tại ===
+                    if progress_callback:
+                        progress_callback(progress_str)
 
         stt = video.get('stt', i + 1)
         # --- CẬP NHẬT CẤU HÌNH YT-DLP ---
